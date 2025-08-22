@@ -31,4 +31,6 @@ n8n flow ideas:
 
 need to add:
 - pagination
-- captcha handling
+- adjust data to be able to handle counties (not just cities)
+- more than 50 view buttons per page (kinda weird)
+- if a matching captcha pops up, still need buster
