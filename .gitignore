@@ -2,3 +2,16 @@
 *.md
 *.txt
 .env
+DEVELOPMENT_SUMMARY.md
+
+# Chrome profile data and extensions
+chrome_profile_buster/
+chrome_profile*/
+test_chrome_profile*/
+buster_extension/
+extensions/
+*.crx
+
+# User data directories  
+user_data/
+User Data/
