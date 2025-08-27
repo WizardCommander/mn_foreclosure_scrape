@@ -32,8 +32,7 @@ n8n flow ideas:
 need to add:
 - pagination
 - adjust data to be able to handle counties (not just cities)
-- more than 50 view buttons per page (kinda weird)
-- 2captcha working. need to adjust "view" button selectors to be more specific i think
-- should be getting 50 records. no duplicates
-- need to improve text parsing so no duplicates or weird entries
+- need to improve text parsing so no duplicates or weird entries (just use ai)
 - adjust csv naming conventions
+- append each record to the csv as its grabbed, dont wait til the end. avoid memory issues
+- got ip blocked. might need to add ip rotation

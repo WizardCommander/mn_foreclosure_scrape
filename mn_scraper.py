@@ -13,6 +13,7 @@ import logging
 import os
 import glob
 import random
+from urllib.parse import urlparse
 
 logging.basicConfig(
     level=logging.INFO,
@@ -49,6 +50,22 @@ class MNNoticeScraperClean:
         self.context = None
         self.page = None
         self.automation_detected = False
+        
+        # Rate limiting configuration
+        self.min_delay = 3.0  # Minimum delay between requests (seconds)
+        self.max_delay = 8.0  # Maximum delay between requests (seconds)
+        self.long_pause_every = 10  # Take a longer pause every N notices
+        self.long_pause_duration = (15, 30)  # Long pause range (seconds)
+        
+        # User agent rotation
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/120.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15'
+        ]
         
         # 2captcha configuration
         self.twocaptcha_api_key = os.getenv('TWO_CAPTCHA_API_KEY')
@@ -117,9 +134,14 @@ class MNNoticeScraperClean:
                 headless=headless,
                 args=launch_args
             )
+            
+            # Select random user agent for this session
+            selected_user_agent = random.choice(self.user_agents)
+            logger.debug(f"🎭 Using user agent: {selected_user_agent[:50]}...")
+            
             self.context = self.browser.new_context(
                 viewport={'width': 1920, 'height': 1080},
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                user_agent=selected_user_agent
             )
             
             self.page = self.context.new_page()
@@ -255,17 +277,33 @@ class MNNoticeScraperClean:
         """Set results per page AFTER search results appear"""
         try:
             results_dropdown_selector = "#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1_ctl01_ddlPerPage"
-            results_dropdown = self.page.wait_for_selector(results_dropdown_selector)
+            
+            # Wait longer for the dropdown to appear and be ready
+            results_dropdown = self.page.wait_for_selector(results_dropdown_selector, timeout=15000)
             
             # Check current selection (for select elements, use get_attribute)
             current_selection = results_dropdown.get_attribute("value")
+            logger.debug(f"🔍 DEBUG: Current results per page: {current_selection}")
+            
             if current_selection == str(per_page):
                 logger.info(f"Results per page already set to {per_page}")
                 return True
             
+            # Select the option and trigger change
             results_dropdown.select_option(str(per_page))
-        # Set results per page
-            time.sleep(5)  # Wait for page reload
+            logger.info(f"Set results per page to {per_page}")
+            
+            # Wait for page reload and verify the change took effect
+            time.sleep(5)  
+            
+            # Verify the setting worked by counting results
+            time.sleep(2)  # Additional wait for stability
+            view_buttons = self.page.query_selector_all(
+                "#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1 input[id*='btnView2'].viewButton"
+            )
+            actual_count = len(view_buttons)
+            logger.info(f"🔍 DEBUG: After setting per_page={per_page}, found {actual_count} buttons")
+            
             return True
             
         except Exception as e:
@@ -275,14 +313,31 @@ class MNNoticeScraperClean:
     def get_view_buttons(self):
         """Find all view buttons on the current page - only from results table"""
         try:
-            # Use specific selector for view buttons inside the results table
+            # Wait for the results table to be stable
+            self.page.wait_for_selector("#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1")
+            time.sleep(1)  # Brief stability wait
+            
+            # Use specific selector for ONLY the visible btnView2 buttons (not hidden btnView buttons)
             view_buttons = self.page.query_selector_all(
-                "#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1 .viewButton"
+                "#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1 input[id*='btnView2'].viewButton"
             )
             
-        # Found view buttons in results
+            logger.debug(f"🔍 DEBUG: Found {len(view_buttons)} view buttons")
             
-            # Only return the ones from the results table
+            # Extract and log button IDs from onclick events for debugging
+            button_ids = []
+            for i, button in enumerate(view_buttons):
+                try:
+                    onclick = button.get_attribute('onclick') or ''
+                    # Extract ID from onclick like: javascript:location.href='Details.aspx?SID=...&ID=852667'
+                    id_match = re.search(r'ID=([0-9]+)', onclick)
+                    button_id = id_match.group(1) if id_match else f'unknown_{i}'
+                    button_ids.append(button_id)
+                except:
+                    button_ids.append(f'error_{i}')
+            
+            logger.debug(f"🔍 DEBUG: Button IDs found: {button_ids[:10]}{'...' if len(button_ids) > 10 else ''}")
+            
             return view_buttons
         except Exception as e:
             logger.error(f"Error finding view buttons: {e}")
@@ -677,23 +732,9 @@ class MNNoticeScraperClean:
             # Wait for reCAPTCHA to process the token
             logger.info("⏳ Waiting for reCAPTCHA to process token...")
             
-            # Wait up to 10 seconds for captcha to clear
-            for wait_time in range(10):
-                time.sleep(1)
-                page_content = self.page.content()
-                
-                # Check if captcha error message is gone
-                if "You must complete the reCAPTCHA" not in page_content:
-                    logger.info(f"🎉 reCAPTCHA cleared after {wait_time + 1} seconds!")
-                    break
-                    
-                # Also check if we can see success indicators
-                success_indicators = self.page.query_selector_all('.rc-anchor-checkbox-checked, [aria-checked="true"]')
-                if success_indicators:
-                    logger.info("✅ Found reCAPTCHA success indicator")
-                    break
-            else:
-                logger.warning("⚠️ reCAPTCHA did not clear within 10 seconds")
+            # Brief wait for token to be processed, then click immediately
+            time.sleep(2)
+            logger.debug("🔘 Proceeding to click View Notice button without waiting for captcha to clear")
             
             time.sleep(1)  # Brief pause before trying to click button
             
@@ -840,32 +881,55 @@ class MNNoticeScraperClean:
         
         return data
     
+    def human_like_delay(self, notice_num=None):
+        """Add human-like delays to avoid detection"""
+        # Regular delay between requests
+        delay = random.uniform(self.min_delay, self.max_delay)
+        logger.debug(f"⏱️  Human-like delay: {delay:.1f}s")
+        time.sleep(delay)
+        
+        # Longer pause every N notices
+        if notice_num and notice_num % self.long_pause_every == 0:
+            long_delay = random.uniform(*self.long_pause_duration)
+            logger.info(f"☕ Taking longer break after {notice_num} notices: {long_delay:.1f}s")
+            time.sleep(long_delay)
+    
     def navigate_back_to_results(self):
         """Navigate back to search results page"""
         try:
-            # Use the specific back link ID from the page source
+            logger.debug("🔙 Attempting to navigate back to search results...")
+            
+            # Method 1: Try the specific back link with force click
             back_link_selector = "#ctl00_ContentPlaceHolder1_PublicNoticeDetailsBody1_hlBackFromBodyTop"
-            
-            logger.info("Attempting to navigate back to search results...")
-            
             try:
                 back_link = self.page.wait_for_selector(back_link_selector, timeout=5000)
-                if back_link and back_link.is_visible():
-                    back_link.click()
-                    logger.info("Clicked specific back link to return to results")
-                    time.sleep(3)  # Wait for navigation
-                    return True
-                else:
-                    logger.warning("Back link found but not visible")
+                if back_link:
+                    # Try JavaScript click to bypass overlays
+                    self.page.evaluate("(element) => element.click()", back_link)
+                    logger.debug("✅ Clicked back link with JavaScript")
+                    time.sleep(3)
+                    
+                    # Verify we're back on results page
+                    results_table = self.page.query_selector("#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1")
+                    if results_table:
+                        logger.debug("✅ Successfully returned to results page")
+                        return True
             except Exception as e:
-                logger.warning(f"Specific back link failed: {e}")
+                logger.debug(f"Back link method failed: {e}")
             
-            # Fallback: try browser back
-            logger.info("Back link failed, trying browser back...")
+            # Method 2: Try browser back
+            logger.debug("Trying browser back navigation...")
             self.page.go_back()
-            logger.info("Used browser back to return to results")
             time.sleep(3)
-            return True
+            
+            # Verify we're back on results page
+            results_table = self.page.query_selector("#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1")
+            if results_table:
+                logger.debug("✅ Browser back successful")
+                return True
+            else:
+                logger.warning("❌ Browser back failed - not on results page")
+                return False
             
         except Exception as e:
             logger.error(f"Error navigating back to results: {e}")
@@ -886,16 +950,32 @@ class MNNoticeScraperClean:
             # Set results per page to 50
             self.set_results_per_page(50)
             
-            # Get initial view buttons count
+            # Get initial view buttons count with deep analysis
             view_buttons = self.get_view_buttons()
             total_notices = len(view_buttons)
             logger.info(f"🌯 Found {total_notices} notices to process")
             
+            # Validate we have the expected 50 results per page
+            if total_notices == 0:
+                logger.error("❌ No view buttons found!")
+                return
+            elif total_notices != 50:
+                logger.info(f"🔍 DEBUG: Expected 50 results but found {total_notices}")
+                if total_notices > 50:
+                    logger.warning("This suggests selector is still catching extra elements")
+                else:
+                    logger.info("This may be the last page with fewer results")
+            elif total_notices > 50:
+                logger.error(f"❌ Found {total_notices} buttons but expected max 50 per page!")
+                logger.error("This suggests a selector issue or page loading problem.")
+                return
+            
+            # Track processed notice IDs to avoid duplicates
+            processed_notice_ids = set()
+            
             # Process each notice
             for i in range(total_notices):
-                if i == 0 or (i+1) % 10 == 0:  # Log every 10th notice
-                    logger.info(f"📄 Processing notice {i+1}/{total_notices}")
-                
+                logger.info(f"📄 Processing notice {i+1}/{total_notices}")
                 
                 # Re-find view buttons to get fresh elements
                 current_view_buttons = self.get_view_buttons()
@@ -905,13 +985,39 @@ class MNNoticeScraperClean:
                 
                 button = current_view_buttons[i]
                 
-                # Click view button
+                # Extract notice ID from button onclick for duplicate tracking
+                onclick = button.get_attribute('onclick') or ''
+                id_match = re.search(r'ID=([0-9]+)', onclick)
+                notice_id = id_match.group(1) if id_match else None
+                
+                if notice_id:
+                    if notice_id in processed_notice_ids:
+                        logger.warning(f"🔍 DEBUG: Duplicate notice ID {notice_id} detected, skipping")
+                        continue
+                    processed_notice_ids.add(notice_id)
+                    logger.debug(f"🔍 DEBUG: Processing notice ID {notice_id}")
+                else:
+                    logger.warning(f"🔍 DEBUG: Could not extract notice ID from button {i+1}")
+                
+                # Add human-like delay before clicking button
+                self.human_like_delay(notice_num=i+1)
+                
+                # Click view button with multiple methods
                 try:
-                    button.click()
+                    # Method 1: Regular click
+                    button.click(timeout=5000)
+                    logger.debug(f"✅ Clicked view button {i+1} (regular click)")
                     time.sleep(2)
                 except Exception as e:
-                    logger.warning(f"Failed to click view button {i+1}: {e}")
-                    continue
+                    logger.debug(f"Regular click failed for button {i+1}: {e}")
+                    try:
+                        # Method 2: JavaScript click to bypass overlays
+                        self.page.evaluate("(element) => element.click()", button)
+                        logger.debug(f"✅ Clicked view button {i+1} (JavaScript click)")
+                        time.sleep(2)
+                    except Exception as e2:
+                        logger.warning(f"❌ Failed to click view button {i+1} with all methods: {e2}")
+                        continue
                 
                 # Handle captcha if present
                 if self.check_for_captcha():
@@ -926,24 +1032,42 @@ class MNNoticeScraperClean:
                 
                 # Extract data
                 current_url = self.page.url
+                logger.debug(f"🔍 DEBUG: Current URL: {current_url}")
+                
+                # Extract notice ID from URL for additional duplicate checking
+                url_id_match = re.search(r'ID=([0-9]+)', current_url)
+                url_notice_id = url_id_match.group(1) if url_id_match else 'unknown'
+                
                 data = self.extract_notice_data(current_url)
+                data['notice_id'] = url_notice_id  # Add for debugging
+                
                 self.results.append(data)
                 
                 if data['first_name'] and data['last_name']:
-                    if (i+1) % 5 == 0:  # Log every 5th extraction
-                        logger.info(f"✅ Extracted: {data['first_name']} {data['last_name']}")
+                    logger.info(f"✅ Extracted #{len(self.results)}: {data['first_name']} {data['last_name']} (ID: {url_notice_id})")
                 else:
-                    logger.debug(f"Incomplete data for notice #{i+1}")
+                    logger.warning(f"❌ Incomplete data for notice #{i+1} (ID: {url_notice_id})")
                 
                 # Navigate back to results for next iteration
                 if not self.navigate_back_to_results():
                     logger.error(f"Failed to navigate back to results after notice {i+1}")
                     break
+                else:
+                    # Small additional delay after successful navigation
+                    time.sleep(random.uniform(1, 3))
                 
                 # Wait for results page to load properly
                 try:
-                    self.page.wait_for_selector("#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1 .viewButton", timeout=10000)
-                    time.sleep(2)  # Additional wait for stability
+                    self.page.wait_for_selector("#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1 input[id*='btnView2'].viewButton", timeout=15000)
+                    time.sleep(3)  # Additional wait for stability
+                    
+                    # Verify we have the expected number of buttons
+                    current_buttons = self.page.query_selector_all(
+                        "#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1 .viewButton"
+                    )
+                    if len(current_buttons) < total_notices:
+                        logger.warning(f"🔍 DEBUG: Button count changed from {total_notices} to {len(current_buttons)}")
+                    
                 except Exception as e:
                     logger.error(f"Results page did not load properly after notice {i+1}: {e}")
                     break
@@ -970,12 +1094,25 @@ class MNNoticeScraperClean:
             filename = f"mn_notices_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         
         full_path = os.path.join(csvs_dir, filename)
-        fieldnames = ['first_name', 'last_name', 'street', 'city', 'state', 'zip', 'date_filed', 'plaintiff', 'link']
+        fieldnames = ['first_name', 'last_name', 'street', 'city', 'state', 'zip', 'date_filed', 'plaintiff', 'link', 'notice_id']
         
         with open(full_path, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(self.results)
+        
+        # Debug: Check for duplicates in final results
+        seen_ids = set()
+        duplicate_count = 0
+        for result in self.results:
+            notice_id = result.get('notice_id', 'unknown')
+            if notice_id in seen_ids:
+                duplicate_count += 1
+                logger.warning(f"🔍 DEBUG: Duplicate in final results - ID {notice_id}")
+            seen_ids.add(notice_id)
+        
+        if duplicate_count > 0:
+            logger.warning(f"🔍 DEBUG: Found {duplicate_count} duplicates in final results")
         
         logger.info(f"📁 Saved {len(self.results)} records to {filename}")
         return full_path
@@ -1010,6 +1147,12 @@ def main():
         print(f"📊 Total records extracted: {len(scraper.results)}")
         print(f"✅ Captchas solved: {scraper.captcha_solved}")
         print(f"⏭️  Notices skipped due to unsolved captcha: {scraper.captcha_skipped}")
+        
+        # Rate limiting summary
+        if len(scraper.results) > 0:
+            avg_delay = (scraper.min_delay + scraper.max_delay) / 2
+            total_minutes = (len(scraper.results) * avg_delay) / 60
+            print(f"🐌 Rate limiting added ~{total_minutes:.1f} minutes to prevent IP blocks")
         
         if scraper.solver:
             print(f"💰 Estimated 2captcha cost: ~${(scraper.captcha_solved * 0.003):.3f}")
