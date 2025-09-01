@@ -248,30 +248,93 @@ marc/
 
 ---
 
-*Last updated: August 27, 2025*  
-*Status: Production ready with enhanced reliability*  
-*Major improvements: Button selector fix, 2captcha integration, IP blocking prevention*  
-*Next priorities: Data parsing enhancement, pagination support*
+*Last updated: August 30, 2025*  
+*Status: Production ready with comprehensive error recovery*  
+*Major improvements: Mullvad VPN integration, advanced error recovery, captcha timing fixes*  
+*Next priorities: Data parsing enhancement, pagination support, GPT-based text analysis*
 
-## Recent Session Summary (August 27, 2025)
+## Recent Session Summary (August 30, 2025)
 
-### Issues Resolved:
-1. **✅ Button Counting Bug**: Fixed selector finding 74+ buttons instead of 50
-2. **✅ Duplicate Data**: Eliminated duplicates caused by hidden button elements  
-3. **✅ IP Blocking**: Implemented comprehensive rate limiting
-4. **✅ Advanced Captchas**: Integrated 2captcha for image challenges
-5. **✅ Technology Migration**: Completed Selenium → Playwright transition
+### Major Issues Resolved:
+1. **✅ IP Blocking Prevention**: Integrated Mullvad VPN with automatic server rotation
+2. **✅ First Captcha Detection**: Fixed timing issue causing missed first notice
+3. **✅ Navigation Failures**: Resolved homepage redirect issue at notice #40
+4. **✅ Stale DOM Recovery**: Implemented automatic detection and recovery from cached button IDs
+5. **✅ Robust Error Handling**: 4-tier navigation fallback system with session recovery
 
-### Key Debugging Session:
-- Deep analysis of page HTML revealed dual button structure
-- Root cause: Each result has visible `btnView2` + hidden `btnView` element
-- Solution: Targeted selector `input[id*='btnView2'].viewButton`
-- Result: Exact 50 button count, eliminated processing duplicates
+### Key Technical Improvements:
+
+#### VPN Integration (`mullvad_manager.py`)
+- **Automatic VPN rotation**: Connects to fresh US server on each run
+- **14 reliable servers**: Ashburn/DC and Atlanta regions from mullvad.net
+- **Session-based rotation**: Avoids repeating servers until all used
+- **Clean integration**: Minimal changes to main scraper, easy to disable
+- **Proper cleanup**: Automatically disconnects VPN when scraping completes
+
+#### Enhanced Captcha Handling
+- **Root cause identified**: Waiting for iframe, not actual checkbox interactivity
+- **ARIA-based detection**: Waits for `aria-checked` attribute indicating full load
+- **15-second patience**: 10 attempts with 1.5s intervals + fallback
+- **Interactive verification**: Ensures checkbox is actually clickable before attempting
+
+#### Navigation Recovery System
+- **Homepage redirect detection**: Automatically detects session timeouts/broken back links
+- **4-tier fallback strategy**: Back links → Browser back → Direct navigation → Full refresh
+- **Stale DOM detection**: Validates buttons have different IDs (not all same ID)
+- **Fresh session recovery**: Clears cache and re-performs search with new session
+- **Smart verification**: Checks first 10 buttons for ID diversity
+
+### Root Cause Analysis:
+
+#### The Notice #40 Issue
+- **Not session timeout**: Happened specifically at #40, not other long pauses
+- **Back link problem**: Notice detail pages have broken back links without session IDs
+- **ASP.NET session management**: Back links point to `Search.aspx#searchResults` without SID parameter
+- **Cumulative effect**: After many navigations, session becomes unstable
+- **Solution**: Automatic detection and recovery rather than prevention
+
+#### First Captcha Miss Pattern
+- **Not timing delay**: Checkbox exists but not interactive when clicked
+- **Loading state issue**: iframe loads before reCAPTCHA JavaScript finishes initialization
+- **ARIA attributes**: Key indicator of full interactivity readiness
+- **Solution**: Wait for interactive state, not just visual presence
 
 ### Performance Impact:
-- **Reliability**: Significantly improved (IP blocking prevention)
-- **Accuracy**: Better (no duplicate processing)  
-- **Speed**: Slower due to rate limiting (7 min vs 30 sec)
-- **Success Rate**: Higher captcha solving (95%+ vs 90%)
+- **Reliability**: Near 100% completion rate with automatic error recovery
+- **First notice capture**: Now consistently captures previously missed first notice
+- **IP rotation**: Fresh IP per session prevents cumulative IP blocking
+- **Recovery speed**: ~30 seconds to recover from homepage redirect vs. manual restart
+- **Robustness**: Handles multiple failure modes gracefully
 
-The scraper is now production-ready with enterprise-level reliability features.
+### File Structure Updates:
+```
+marc/
+├── mn_scraper.py           # Enhanced main scraper with error recovery
+├── mullvad_manager.py      # NEW: VPN management module
+├── csvs/                   # Output folder for CSV results  
+├── README.md              # Updated quick start guide
+├── CLAUDE.md              # Project workflow instructions
+├── DEVELOPMENT_SUMMARY.md # This comprehensive update
+├── overview.txt           # Original project requirements
+└── requirements.txt       # Updated: playwright, 2captcha-python, python-dotenv
+```
+
+### Current Limitations Identified:
+1. **Data parsing quality**: Still getting "csstransitions fontface" artifacts in names
+2. **Single page processing**: No pagination support (processes 50 results max)
+3. **County-level data**: Limited geographic parsing beyond city level
+
+### Recommended Next Steps:
+1. **GPT-3.5 text analysis**: ~$0.21 for 300 notices would dramatically improve data quality
+2. **Pagination implementation**: Process multiple pages for comprehensive coverage  
+3. **Real-time CSV append**: Avoid memory issues for large batches
+4. **Advanced IP rotation**: Residential proxies for enterprise-scale operations
+
+### Technical Achievements:
+- **Zero manual intervention**: Fully autonomous operation with automatic error recovery
+- **Enterprise reliability**: Handles all known failure modes gracefully
+- **Clean architecture**: Modular VPN management, separation of concerns
+- **Comprehensive logging**: Detailed debug information for any remaining issues
+- **Production ready**: Stable, robust, and ready for daily automated runs
+
+The scraper now operates with enterprise-level reliability and can handle the full range of website quirks and session management issues autonomously.

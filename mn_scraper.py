@@ -314,32 +314,12 @@ class MNNoticeScraperClean:
             logger.warning(f"Error setting results per page to {per_page}: {e}")
             return False
     
-    def get_view_buttons(self, force_refresh=False):
+    def get_view_buttons(self):
         """Find all view buttons on the current page - only from results table"""
         try:
-            # Force page refresh if requested to get fresh DOM elements  
-            if force_refresh:
-                logger.debug("🔄 Clearing cached state and getting fresh DOM elements...")
-                # Clear any cached button state
-                if hasattr(self, '_button_cache'):
-                    delattr(self, '_button_cache')
-                
-                # Go to search page and restore with fresh session
-                self.page.goto(self.search_url)
-                time.sleep(3)
-                
-                if hasattr(self, '_last_search_keywords'):
-                    logger.debug("🔍 Re-performing search with completely fresh session...")
-                    if self.search_notices(self._last_search_keywords, 1):
-                        self.set_results_per_page(50)
-                        logger.debug("✅ Fresh search completed successfully")
-                        time.sleep(2)
-                    else:
-                        logger.error("❌ Failed to restore search with fresh session")
-            
             # Wait for the results table to be stable
             self.page.wait_for_selector("#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1", timeout=15000)
-            time.sleep(2)  # Increased stability wait
+            time.sleep(1)  # Reduced wait time since we're not doing expensive operations
             
             # Use specific selector for ONLY the visible btnView2 buttons (not hidden btnView buttons)
             view_buttons = self.page.query_selector_all(
@@ -958,162 +938,64 @@ class MNNoticeScraperClean:
             logger.info(f"☕ Taking longer break after {notice_num} notices: {long_delay:.1f}s")
             time.sleep(long_delay)
     
-    def navigate_back_to_results(self, retry_search=True):
-        """Navigate back to search results page with multiple fallback strategies"""
-        max_attempts = 4
-        
-        for attempt in range(max_attempts):
+    def verify_on_results_page(self, timeout=5000):
+        """Verify we're on the search results page with view buttons"""
+        try:
+            # Quick URL check first
+            current_url = self.page.url
+            if "Search.aspx" not in current_url:
+                logger.debug(f"URL check failed: {current_url}")
+                return False
+            
+            # Wait for results table to be present
             try:
-                logger.debug(f"🔙 Navigation attempt {attempt + 1}/{max_attempts}")
-                success = False
+                self.page.wait_for_selector(
+                    "#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1", 
+                    timeout=timeout
+                )
+            except Exception:
+                logger.debug("Results table not found")
+                return False
+            
+            # Verify we have view buttons
+            view_buttons = self.page.query_selector_all(
+                "#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1 input[id*='btnView2'].viewButton"
+            )
+            
+            if len(view_buttons) >= 10:  # Should have many buttons on results page
+                logger.debug(f"✅ Results page verified - {len(view_buttons)} buttons found")
+                return True
+            else:
+                logger.debug(f"Insufficient buttons found: {len(view_buttons)}")
+                return False
                 
-                # Method 1: Try specific back link
-                if attempt == 0:
-                    try:
-                        back_link_selectors = [
-                            "#ctl00_ContentPlaceHolder1_PublicNoticeDetailsBody1_hlBackFromBodyTop",
-                            "#ctl00_ContentPlaceHolder1_PublicNoticeDetailsBody1_hlBackFromBodyBottom", 
-                            "a[href*='Search.aspx']"
-                        ]
-                        
-                        for selector in back_link_selectors:
-                            back_link = self.page.query_selector(selector)
-                            if back_link and back_link.is_visible():
-                                self.page.evaluate("(element) => element.click()", back_link)
-                                logger.debug(f"✅ Clicked back link: {selector}")
-                                time.sleep(4)
-                                success = True
-                                break
-                        
-                        if not success:
-                            logger.debug("⚠️ No back links found, trying browser back")
-                            
-                    except Exception as e:
-                        logger.debug(f"Back link method failed: {e}")
+        except Exception as e:
+            logger.debug(f"Results page verification failed: {e}")
+            return False
+
+    def navigate_back_to_results(self):
+        """Navigate back to search results page using browser back (handles captcha case)"""
+        try:
+            # Try up to 2 back clicks to handle captcha navigation
+            for attempt in range(2):
+                logger.debug(f"🔙 Browser back attempt {attempt + 1}/2")
+                self.page.go_back()
+                time.sleep(3)
                 
-                # Method 2: Browser back navigation
-                if not success and attempt <= 1:
-                    try:
-                        logger.debug("🔙 Trying browser back navigation...")
-                        self.page.go_back()
-                        time.sleep(4)
-                        success = True
-                    except Exception as e:
-                        logger.debug(f"Browser back failed: {e}")
-                
-                # Method 3: Direct navigation to search results URL
-                if not success and attempt <= 2:
-                    try:
-                        logger.debug("🔙 Direct navigation to search results...")
-                        self.page.goto(self.search_url, wait_until='networkidle')
-                        time.sleep(3)
-                        
-                        # Re-perform the last search
-                        if retry_search and hasattr(self, '_last_search_keywords'):
-                            logger.info("🔄 Re-performing search to restore results...")
-                            if self.search_notices(self._last_search_keywords, 1):
-                                self.set_results_per_page(50)
-                                success = True
-                                logger.info("✅ Search restored successfully")
-                            else:
-                                logger.error("❌ Failed to restore search results")
-                        else:
-                            success = True
-                            
-                    except Exception as e:
-                        logger.debug(f"Direct navigation failed: {e}")
-                
-                # Method 4: Full page refresh and search restoration
-                if not success and attempt == 3:
-                    try:
-                        logger.debug("🔄 Full page refresh and search restoration...")
-                        self.page.reload(wait_until='networkidle')
-                        time.sleep(5)
-                        
-                        if retry_search and hasattr(self, '_last_search_keywords'):
-                            if self.search_notices(self._last_search_keywords, 1):
-                                self.set_results_per_page(50)
-                                success = True
-                                logger.info("✅ Full recovery successful")
-                                
-                    except Exception as e:
-                        logger.debug(f"Full recovery failed: {e}")
-                
-                # Verify we're back on results page and detect homepage redirects
-                if success:
-                    verification_attempts = 3
-                    for verify_attempt in range(verification_attempts):
-                        try:
-                            # Check if we ended up on homepage instead of results
-                            current_url = self.page.url
-                            if "Search.aspx" not in current_url or "#searchResults" not in current_url:
-                                logger.warning("⚠️ Detected homepage redirect - performing recovery")
-                                # Clear any cached button state
-                                if hasattr(self, '_button_cache'):
-                                    delattr(self, '_button_cache')
-                                
-                                # Navigate to search and restore results
-                                self.page.goto(self.search_url)
-                                time.sleep(3)
-                                
-                                if hasattr(self, '_last_search_keywords'):
-                                    logger.info("🔄 Recovering from homepage redirect - performing fresh search...")
-                                    if self.search_notices(self._last_search_keywords, 1):
-                                        self.set_results_per_page(50)
-                                        logger.info("✅ Recovery successful - fresh search completed")
-                                        time.sleep(3)  # Give page time to stabilize
-                                    else:
-                                        logger.error("❌ Recovery failed - could not restore search")
-                                        return False
-                            
-                            # Wait for results table
-                            self.page.wait_for_selector("#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1", timeout=10000)
-                            time.sleep(2)
-                            
-                            # Check for view buttons
-                            buttons = self.page.query_selector_all(
-                                "#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1 input[id*='btnView2'].viewButton"
-                            )
-                            
-                            if len(buttons) > 0:
-                                # Verify buttons have different IDs (not stale DOM)
-                                button_ids = []
-                                for button in buttons[:10]:  # Check first 10 buttons
-                                    onclick = button.get_attribute('onclick') or ''
-                                    id_match = re.search(r'ID=([0-9]+)', onclick)
-                                    if id_match:
-                                        button_ids.append(id_match.group(1))
-                                
-                                unique_ids = len(set(button_ids))
-                                if unique_ids > 1:  # We have different button IDs - DOM is fresh
-                                    logger.debug(f"✅ Results page verified - {len(buttons)} buttons with {unique_ids} unique IDs")
-                                    return True
-                                else:
-                                    logger.warning(f"⚠️ Stale DOM detected - only {unique_ids} unique IDs from {len(button_ids)} buttons")
-                                    if verify_attempt < verification_attempts - 1:
-                                        logger.debug("🔄 Forcing page refresh to clear stale DOM...")
-                                        self.page.reload()
-                                        time.sleep(3)
-                                        continue
-                            else:
-                                logger.debug(f"⚠️ No buttons found on verification attempt {verify_attempt + 1}")
-                                time.sleep(3)
-                                
-                        except Exception as e:
-                            logger.debug(f"Results verification failed: {e}")
-                            time.sleep(2)
-                
-                # If we get here, this attempt failed
-                logger.debug(f"❌ Navigation attempt {attempt + 1} failed")
-                time.sleep(2)
-                
-            except Exception as e:
-                logger.debug(f"Navigation attempt {attempt + 1} error: {e}")
-                time.sleep(2)
-        
-        # All attempts failed
-        logger.error("❌ All navigation attempts failed")
-        return False
+                # Check if we're back on results page
+                if self.verify_on_results_page():
+                    logger.debug(f"✅ Successfully navigated back after {attempt + 1} back click(s)")
+                    return True
+                else:
+                    logger.debug(f"Not on results page yet (attempt {attempt + 1}/2)")
+            
+            # Failed after 2 attempts
+            logger.error("❌ Failed to navigate back to results after 2 back clicks")
+            return False
+            
+        except Exception as e:
+            logger.error(f"❌ Browser back navigation error: {e}")
+            return False
     
     def scrape_notices(self, keywords=['foreclosure', 'bankruptcy'], days_back=1):
         """Main scraping function"""
@@ -1164,76 +1046,69 @@ class MNNoticeScraperClean:
             # Track processed notice IDs to avoid duplicates
             processed_notice_ids = set()
             
-            # Process each notice
-            for i in range(total_notices):
-                logger.info(f"📄 Processing notice {i+1}/{total_notices}")
+            # Process each notice using ID-based iteration (not index-based)
+            notices_processed = 0
+            while notices_processed < total_notices:
+                logger.info(f"📄 Processing notice {notices_processed + 1}/{total_notices}")
                 
-                # Re-find view buttons to get fresh elements
+                # Get fresh view buttons
                 current_view_buttons = self.get_view_buttons()
-                if i >= len(current_view_buttons):
-                    logger.warning(f"View button {i+1} no longer exists")
+                if not current_view_buttons:
+                    logger.warning("No view buttons found - ending processing")
                     break
                 
-                button = current_view_buttons[i]
+                # Find the next unprocessed notice
+                button = None
+                notice_id = None
                 
-                # Extract notice ID from button onclick for duplicate tracking
-                onclick = button.get_attribute('onclick') or ''
-                id_match = re.search(r'ID=([0-9]+)', onclick)
-                notice_id = id_match.group(1) if id_match else None
-                
-                if notice_id:
-                    if notice_id in processed_notice_ids:
-                        logger.warning(f"🔍 DEBUG: Duplicate notice ID {notice_id} detected - possible stale DOM")
-                        logger.info("🔄 Attempting DOM refresh to get fresh buttons...")
-                        
-                        # Try to get fresh buttons with force refresh
-                        current_view_buttons = self.get_view_buttons(force_refresh=True)
-                        if i >= len(current_view_buttons):
-                            logger.warning(f"View button {i+1} no longer exists after refresh")
-                            break
-                            
-                        button = current_view_buttons[i]
-                        onclick = button.get_attribute('onclick') or ''
-                        id_match = re.search(r'ID=([0-9]+)', onclick)
-                        notice_id = id_match.group(1) if id_match else None
-                        
-                        # Check if we still have the same duplicate
-                        if notice_id and notice_id in processed_notice_ids:
-                            logger.error(f"❌ Still getting duplicate ID {notice_id} after refresh - skipping")
-                            continue
+                for candidate_button in current_view_buttons:
+                    # Extract notice ID from button onclick
+                    onclick = candidate_button.get_attribute('onclick') or ''
+                    id_match = re.search(r'ID=([0-9]+)', onclick)
+                    candidate_id = id_match.group(1) if id_match else None
                     
-                    processed_notice_ids.add(notice_id)
-                    logger.debug(f"🔍 DEBUG: Processing notice ID {notice_id}")
-                else:
-                    logger.warning(f"🔍 DEBUG: Could not extract notice ID from button {i+1}")
+                    if candidate_id and candidate_id not in processed_notice_ids:
+                        # Found an unprocessed notice
+                        button = candidate_button
+                        notice_id = candidate_id
+                        logger.debug(f"🔍 Found unprocessed notice ID: {notice_id}")
+                        break
+                
+                if not button or not notice_id:
+                    logger.warning("No more unprocessed notices found")
+                    break
+                
+                # Track this notice as being processed
+                processed_notice_ids.add(notice_id)
+                notices_processed += 1
                 
                 # Add human-like delay before clicking button
-                self.human_like_delay(notice_num=i+1)
+                self.human_like_delay(notice_num=notices_processed)
                 
                 # Click view button with multiple methods
                 try:
                     # Method 1: Regular click
                     button.click(timeout=5000)
-                    logger.debug(f"✅ Clicked view button {i+1} (regular click)")
+                    logger.debug(f"✅ Clicked view button for notice {notice_id} (regular click)")
                     time.sleep(2)
                 except Exception as e:
-                    logger.debug(f"Regular click failed for button {i+1}: {e}")
+                    logger.debug(f"Regular click failed for notice {notice_id}: {e}")
                     try:
                         # Method 2: JavaScript click to bypass overlays
                         self.page.evaluate("(element) => element.click()", button)
-                        logger.debug(f"✅ Clicked view button {i+1} (JavaScript click)")
+                        logger.debug(f"✅ Clicked view button for notice {notice_id} (JavaScript click)")
                         time.sleep(2)
                     except Exception as e2:
-                        logger.warning(f"❌ Failed to click view button {i+1} with all methods: {e2}")
+                        logger.warning(f"❌ Failed to click view button for notice {notice_id} with all methods: {e2}")
                         continue
                 
                 # Handle captcha if present
                 if self.check_for_captcha():
-                    logger.info(f"🤖 Captcha on notice #{i+1}")
+                    logger.info(f"🤖 Captcha on notice #{notice_id}")
                     if self.solve_captcha_simple():
-                        logger.info(f"✅ Captcha solved for notice #{i+1}")
+                        logger.info(f"✅ Captcha solved for notice #{notice_id}")
                     else:
-                        logger.warning(f"❌ Failed to solve captcha for notice #{i+1} - skipping")
+                        logger.warning(f"❌ Failed to solve captcha for notice #{notice_id} - skipping")
                         self.captcha_skipped += 1
                         self.navigate_back_to_results()
                         continue
@@ -1254,7 +1129,7 @@ class MNNoticeScraperClean:
                 if data['first_name'] and data['last_name']:
                     logger.info(f"✅ Extracted #{len(self.results)}: {data['first_name']} {data['last_name']} (ID: {url_notice_id})")
                 else:
-                    logger.warning(f"❌ Incomplete data for notice #{i+1} (ID: {url_notice_id})")
+                    logger.warning(f"❌ Incomplete data for notice #{notice_id} (ID: {url_notice_id})")
                 
                 # Navigate back to results for next iteration with retry logic
                 navigation_success = False
@@ -1265,18 +1140,18 @@ class MNNoticeScraperClean:
                         time.sleep(random.uniform(1, 3))
                         break
                     else:
-                        logger.warning(f"⚠️ Navigation attempt {nav_attempt + 1}/2 failed for notice {i+1}")
+                        logger.warning(f"⚠️ Navigation attempt {nav_attempt + 1}/2 failed for notice {notice_id}")
                         if nav_attempt == 0:  # Give it one more try with a longer wait
                             time.sleep(5)
                 
                 if not navigation_success:
-                    logger.error(f"❌ All navigation attempts failed after notice {i+1}")
+                    logger.error(f"❌ All navigation attempts failed after notice {notice_id}")
                     logger.error(f"📊 Partial results: Successfully processed {len(self.results)} notices")
                     
                     # Try one last recovery attempt - full session restoration
                     logger.info("🔄 Attempting full session recovery...")
                     try:
-                        if self.navigate_back_to_results(retry_search=True):
+                        if self.navigate_back_to_results():
                             logger.info("✅ Session recovery successful - continuing...")
                             navigation_success = True
                         else:
@@ -1312,10 +1187,10 @@ class MNNoticeScraperClean:
                             time.sleep(2)
                     
                     if not buttons_ready:
-                        logger.warning(f"⚠️ Results page may not be fully loaded after notice {i+1}")
+                        logger.warning(f"⚠️ Results page may not be fully loaded after notice {notice_id}")
                     
                 except Exception as e:
-                    logger.error(f"Results page did not load properly after notice {i+1}: {e}")
+                    logger.error(f"Results page did not load properly after notice {notice_id}: {e}")
                     logger.error("Attempting to continue anyway...")
                     time.sleep(5)  # Give it more time before continuing
             
