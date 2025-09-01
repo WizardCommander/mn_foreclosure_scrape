@@ -30,14 +30,16 @@ n8n flow ideas:
 - once finished, send csv via gmail node to correct contact, or just output to a googlesheet
 
 need to add:
-- pagination
-- adjust data to be able to handle counties (not just cities)
-- need to improve text parsing so no duplicates or weird entries (just use ai)
-- adjust csv naming conventions
 - append each record to the csv as its grabbed, dont wait til the end. avoid memory issues
+- date is currently hardcoded for 8/31/25
 
 latest issues:
 - waits a little too long for captcha to load
 1. O(n²) complexity: For each notice, we iterate through all buttons to find unprocessed ones
     - Assessment: Acceptable because n=50 max, and this eliminates 90-second delays
     - Alternative: Could build ID→button map, but premature optimization
+
+- some notices are pdf only and/or have no link
+- if scraper crashes scraped data up to that point isnt saved
+- probly need fallback for if connection errors out
+- change naming convention of csv files
