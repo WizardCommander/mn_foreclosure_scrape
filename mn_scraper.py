@@ -22,13 +22,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables from .env file
+# Load environment variables from .env file BEFORE importing gpt_parser
 try:
     from dotenv import load_dotenv
     load_dotenv()
     logger.info("🔧 .env file loaded")
 except ImportError:
     logger.warning("⚠️  python-dotenv not installed - install with: py -m pip install python-dotenv")
+
+# Import GPT parser after .env is loaded
+from gpt_parser import extract_notice_data_gpt, get_parsing_stats
 
 # 2captcha integration
 try:
@@ -840,90 +843,37 @@ class MNNoticeScraperClean:
     
     
     def extract_notice_data(self, source_url=""):
-        """Extract required fields from current page"""
-        data = {
-            'first_name': '',
-            'last_name': '',
-            'street': '',
-            'city': '',
-            'state': 'MN',
-            'zip': '',
-            'date_filed': '',
-            'plaintiff': '',
-            'link': source_url
-        }
-        
+        """Extract required fields from current page using GPT parser"""
         try:
+            # Get the raw page text
             page_text = self.page.content()
             
-            # Extract name
-            name_patterns = [
-                r'(?:MORTGAGOR|DEBTOR|DEFENDANT)(?:\(S\))?:\s*([A-Z][a-zA-Z\'\-\.]+)\s+([A-Z][a-zA-Z\'\-\.]+)',
-                r'(?:vs?\.?|versus)\s+([A-Z][a-zA-Z\'\-\.]+)\s+([A-Z][a-zA-Z\'\-\.]+)',
-                r'([A-Z][a-zA-Z\'\-\.]+)\s+([A-Z][a-zA-Z\'\-\.]+),?\s+(?:vs?\.?|versus)',
-                r'([A-Z][a-zA-Z\'\-\.]+)\s+([A-Z][a-zA-Z\'\-\.]+)(?:,?\s+(?:and|&))',
-                r'(?:Defendant|Debtor)s?:\s*([A-Z][a-zA-Z\'\-\.]+)\s+([A-Z][a-zA-Z\'\-\.]+)',
-                r'([A-Z][a-zA-Z\'\-\.]+)\s+([A-Z][a-zA-Z\'\-\.]+),?\s+(?:Defendant|Debtor)',
-            ]
+            # Use GPT parser to extract structured data
+            logger.debug(f"🔍 Extracting data from notice...")
+            data = extract_notice_data_gpt(page_text, source_url)
             
-            for pattern in name_patterns:
-                match = re.search(pattern, page_text, re.IGNORECASE)
-                if match:
-                    data['first_name'] = match.group(1).strip()
-                    data['last_name'] = match.group(2).strip()
-                    break
+            # Log what we extracted for debugging
+            if data['first_name'] and data['last_name']:
+                logger.debug(f"✅ Extracted: {data['first_name']} {data['last_name']} @ {data['street']}")
+            else:
+                logger.warning(f"⚠️ No name extracted from notice")
             
-            # Extract address
-            address_patterns = [
-                r'(?:PROPERTY\s+ADDRESS|ADDRESS|LOCATED\s+AT|PREMISES):\s*(\d+[^,\n]+?),\s*([^,\n]+?),\s*(?:MN|Minnesota)\s*(\d{5}(?:-\d{4})?)',
-                r'(\d+\s+[A-Za-z0-9\s\#\.\-]+?),\s*([A-Za-z\s]+?),\s*(?:MN|Minnesota)\s*(\d{5}(?:-\d{4})?)',
-                r'(?:situated|located)(?:\s+at)?:?\s*(\d+[^,\n]+?),\s*([^,\n]+?),\s*(?:MN|Minnesota)\s*(\d{5}(?:-\d{4})?)',
-            ]
-            
-            for pattern in address_patterns:
-                match = re.search(pattern, page_text, re.IGNORECASE)
-                if match:
-                    data['street'] = match.group(1).strip()
-                    data['city'] = match.group(2).strip()
-                    data['zip'] = match.group(3).strip()
-                    break
-            
-            # Extract date filed
-            date_patterns = [
-                r'(?:Filed|Recorded|Entered)(?:\s+on)?\s+([A-Z][a-z]+\s+\d{1,2},\s+\d{4})',
-                r'(?:Filed|Date\s+Filed|Filed\s+on|Recorded|Date):\s*(\d{1,2}/\d{1,2}/\d{4})',
-                r'(?:Filed|Date\s+Filed|Filed\s+on|Recorded|Date):\s*([A-Z][a-z]+\s+\d{1,2},\s+\d{4})',
-                r'(\d{1,2}/\d{1,2}/\d{4})',
-                r'([A-Z][a-z]+\s+\d{1,2},\s+\d{4})',
-            ]
-            
-            for pattern in date_patterns:
-                match = re.search(pattern, page_text)
-                if match:
-                    data['date_filed'] = match.group(1)
-                    break
-            
-            # Extract plaintiff/creditor
-            plaintiff_patterns = [
-                r'(?:Assignee\s+of\s+Mortgagee|Current\s+Holder|Servicer|Lender)(?:[^:]*)?:\s*([^,\n<]+)',
-                r'(?:MORTGAGEE|CREDITOR|PLAINTIFF|LENDER):\s*([^,\n<]+)',
-                r'(?:Plaintiff|Creditor|Petitioner)(?:\(s\))?:\s*([^,\n]+)',
-                r'([^,\n\vs]+?)\s+(?:vs?\.?|versus)',
-                r'([A-Z][A-Za-z\s]+?(?:Bank|Credit|Financial|Corp|Inc|LLC|Company|Fund|Trust|Association)[^,\n]*)',
-            ]
-            
-            for pattern in plaintiff_patterns:
-                match = re.search(pattern, page_text, re.IGNORECASE)
-                if match:
-                    plaintiff = match.group(1).strip()
-                    plaintiff = re.sub(r'\s+', ' ', plaintiff)
-                    data['plaintiff'] = plaintiff
-                    break
+            return data
             
         except Exception as e:
-            logger.error(f"Error extracting notice data: {e}")
-        
-        return data
+            logger.error(f"❌ Error extracting notice data: {e}")
+            # Return empty structure on error
+            return {
+                'first_name': '',
+                'last_name': '',
+                'street': '',
+                'city': '',
+                'state': 'MN',
+                'zip': '',
+                'date_filed': '',
+                'plaintiff': '',
+                'link': source_url
+            }
     
     def human_like_delay(self, notice_num=None):
         """Add human-like delays to avoid detection"""
@@ -1275,14 +1225,25 @@ def main():
         print(f"✅ Captchas solved: {scraper.captcha_solved}")
         print(f"⏭️  Notices skipped due to unsolved captcha: {scraper.captcha_skipped}")
         
+        # Parsing statistics
+        parsing_stats = get_parsing_stats()
+        if parsing_stats['total_parses'] > 0:
+            print(f"🤖 GPT parsing success rate: {parsing_stats['gpt_success_rate']}% ({parsing_stats['gpt_successful']}/{parsing_stats['total_parses']})")
+            if parsing_stats['regex_fallbacks'] > 0:
+                print(f"🔄 Regex fallbacks used: {parsing_stats['regex_fallbacks']} times")
+        
         # Rate limiting summary
         if len(scraper.results) > 0:
             avg_delay = (scraper.min_delay + scraper.max_delay) / 2
             total_minutes = (len(scraper.results) * avg_delay) / 60
             print(f"🐌 Rate limiting added ~{total_minutes:.1f} minutes to prevent IP blocks")
         
+        # Cost estimates
         if scraper.solver:
             print(f"💰 Estimated 2captcha cost: ~${(scraper.captcha_solved * 0.003):.3f}")
+        if parsing_stats['gpt_successful'] > 0:
+            gpt_cost = parsing_stats['gpt_successful'] * 0.002  # ~$0.002 per GPT call
+            print(f"🧠 Estimated GPT cost: ~${gpt_cost:.3f}")
         
     except Exception as e:
         logger.error(f"Scraper failed: {e}")

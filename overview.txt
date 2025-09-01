@@ -37,8 +37,6 @@ need to add:
 - append each record to the csv as its grabbed, dont wait til the end. avoid memory issues
 
 latest issues:
-- every back click sending back to search page. i think because method 3 for the back links is to send back to 'search.aspx'. first 2 methods failing
-- missed notice 2 notices due to 2captcha failure i think. (96% coverage is not terrible)
 - waits a little too long for captcha to load
 1. O(n²) complexity: For each notice, we iterate through all buttons to find unprocessed ones
     - Assessment: Acceptable because n=50 max, and this eliminates 90-second delays
