@@ -3,6 +3,8 @@
 *.txt
 .env
 DEVELOPMENT_SUMMARY.md
+__pycache__/
+*/__pycache__
 
 # Chrome profile data and extensions
 chrome_profile_buster/
