@@ -1,0 +1,237 @@
+TROUBLESHOOTING GUIDE
+====================
+
+This guide helps you solve common problems with the MN Notice Scraper.
+
+PYTHON INSTALLATION PROBLEMS
+=============================
+
+"Python not found" or "python is not recognized"
+------------------------------------------------
+SOLUTION:
+1. Go to https://www.python.org/downloads/
+2. Download Python 3.8 or newer
+3. During installation, CHECK the box "Add Python to PATH"
+4. Restart your computer
+5. Try running the scraper again
+
+"pip not found" or "pip is not recognized"
+-----------------------------------------
+SOLUTION:
+1. Reinstall Python from python.org
+2. During installation, make sure "pip" is checked
+3. Restart your computer
+4. Try again
+
+Package Installation Failed
+---------------------------
+ERROR: "Failed to install Python packages"
+SOLUTION:
+1. Check your internet connection
+2. Try running the scraper as administrator (Windows) or with sudo (Mac)
+3. If still failing, open Command Prompt/Terminal and run:
+   pip install --upgrade pip
+   pip install -r requirements.txt
+
+API KEY PROBLEMS
+================
+
+"2captcha API key appears invalid"
+---------------------------------
+SOLUTION:
+1. Log into your 2captcha account at https://2captcha.com/
+2. Go to your dashboard
+3. Copy the API key (should be 32 characters long)
+4. Delete the .env file from your scraper folder
+5. Run the scraper again and enter the correct API key
+
+"OpenAI API key appears invalid"
+-------------------------------
+SOLUTION:
+1. Log into https://platform.openai.com/
+2. Go to API Keys section
+3. Copy your API key (should start with "sk-proj-" or "sk-")
+4. Delete the .env file from your scraper folder
+5. Run the scraper again and enter the correct API key
+
+API Key Balance Issues
+---------------------
+ERROR: "insufficient funds" or "zero balance"
+SOLUTION:
+1. 2captcha: Log in and add funds to your account ($10 typically lasts months)
+2. OpenAI: Log in and add credit to your account ($5-10 typically lasts months)
+
+VPN PROBLEMS (IMPORTANT!)
+=========================
+
+"Mullvad CLI not found"
+----------------------
+SOLUTION:
+1. Download Mullvad from https://mullvad.net/
+2. Install the application
+3. WARNING: The scraper WILL work without VPN but you WILL get IP banned after a few runs
+4. IP bans typically last 2 days
+5. VPN is HIGHLY RECOMMENDED for regular use
+
+VPN Connection Failed
+--------------------
+SOLUTION:
+1. Make sure you have an active Mullvad subscription
+2. Check your internet connection
+3. IMPORTANT: If VPN fails, consider waiting to run the scraper - you may get IP banned
+
+IP BANNED FROM WEBSITE
+======================
+SYMPTOMS: 
+- Website loads very slowly or times out
+- Getting "Access denied" or similar errors
+- Scraper can't find any results
+
+SOLUTION:
+1. Wait 48-72 hours before trying again
+2. Make sure Mullvad VPN is working before next run
+3. Test VPN by checking your IP at whatismyipaddress.com
+4. If you keep getting banned, try different VPN servers
+
+PREVENTING IP BANS:
+- ALWAYS use VPN for regular scraping
+- Don't run the scraper multiple times per day
+- Don't run it manually right after automated runs
+- The scraper has built-in delays but VPN is still essential
+
+SCRAPING PROBLEMS
+================
+
+"No view buttons found"
+----------------------
+SOLUTION:
+1. Check if you're IP banned (see above)
+2. The website might be down - try again later
+3. Check if the website structure changed
+
+"Search failed for keywords"
+---------------------------
+SOLUTION:
+1. Check your internet connection
+2. Check if you're IP banned (try accessing the website manually)
+3. The website might be experiencing issues
+4. Try again in a few hours
+
+Captcha Solving Failed
+---------------------
+ERROR: Many captchas fail to solve
+SOLUTION:
+1. Check your 2captcha account has sufficient funds
+2. 2captcha service might be slow - this is normal occasionally
+3. The scraper will skip notices it can't solve and continue
+
+No Results Found
+---------------
+SOLUTION:
+1. This is normal on some days (weekends, holidays)
+2. The scraper looks for yesterday's notices - there might not be any
+3. Check that today isn't a holiday when courts are closed
+4. Check if you're IP banned
+
+BROWSER PROBLEMS
+===============
+
+Browser Won't Start
+------------------
+ERROR: "Failed to setup Playwright browser"
+SOLUTION:
+1. Close all Chrome windows
+2. Restart your computer
+3. Run the scraper again
+4. If still failing, the batch file will try to reinstall browser components
+
+Page Loading Slowly
+------------------
+SYMPTOMS: Scraper seems stuck on one notice
+SOLUTION:
+1. This is normal - some pages load slowly
+2. The scraper has built-in timeouts and will continue
+3. If it's been stuck for more than 10 minutes, close and restart
+
+FILE AND FOLDER PROBLEMS
+========================
+
+"Permission Denied" Errors
+--------------------------
+SOLUTION:
+1. Windows: Right-click the batch file and "Run as administrator"
+2. Mac: Open Terminal, navigate to folder, run: chmod +x run_scraper.sh
+3. Make sure no antivirus is blocking the files
+
+Missing CSV Files
+----------------
+SOLUTION:
+1. Check the "csvs" folder in your scraper directory
+2. Files are named with yesterday's date (mn_notices_2023-09-04.csv)
+3. If scraper finished but no file, check for error messages
+
+CSV File is Empty or Has Few Results
+-----------------------------------
+SOLUTION:
+1. This can happen on slow news days
+2. Check the dates - weekends and holidays have fewer notices
+3. Verify your API keys are working
+4. Check if you're IP banned
+
+PERFORMANCE PROBLEMS
+===================
+
+Scraper Running Very Slowly
+---------------------------
+SOLUTION:
+1. This is normal - the scraper includes delays to avoid being blocked
+2. Expect 15-25 minutes for a full run (200-300 notices)
+3. If taking much longer, check your internet connection
+
+Computer Running Hot/Slow During Scraping
+----------------------------------------
+SOLUTION:
+1. Close other programs while scraping
+2. This is normal - web scraping uses CPU and memory
+3. Run scraper during off-hours when you're not using the computer
+
+AUTOMATION PROBLEMS
+==================
+
+Scheduled Task Not Running
+-------------------------
+WINDOWS:
+1. Open Task Scheduler
+2. Check that task is enabled
+3. Check "Run whether user is logged on or not" is checked
+4. Check "Run with highest privileges" is checked
+
+MAC:
+1. Check cron job with: crontab -l
+2. Check system log for errors: grep CRON /var/log/system.log
+
+Scheduled Task Runs But No Output
+--------------------------------
+SOLUTION:
+1. Make sure the "Start in" folder is set correctly
+2. Use full file paths, not relative paths
+3. Test the batch file manually first
+
+GETTING MORE HELP
+=================
+
+If none of these solutions work:
+
+1. Check the scraper's output messages carefully
+2. Note the exact error message
+3. Try running each step manually to isolate the problem
+4. Make sure you followed the SETUP_GUIDE.txt exactly
+
+Common fixes that solve 90% of problems:
+- Restart your computer
+- Reinstall Python with "Add to PATH" checked
+- Delete .env file and re-enter API keys
+- Run as administrator (Windows)
+- Make sure VPN is connected before running
+
+CRITICAL REMINDER: Always use VPN to prevent IP bans! The website will block your IP for 2+ days if you scrape without VPN protection.

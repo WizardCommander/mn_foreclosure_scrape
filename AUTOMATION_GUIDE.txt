@@ -1,0 +1,165 @@
+AUTOMATION GUIDE - SCHEDULE DAILY SCRAPING
+=========================================
+
+This guide shows you how to set up the scraper to run automatically every day.
+
+RECOMMENDED SCHEDULE
+-------------------
+Best time to run: 8:00 AM daily
+Why: New notices from yesterday will be available, and you'll have results early in the day.
+
+FOR WINDOWS USERS - TASK SCHEDULER
+==================================
+
+STEP 1: Open Task Scheduler
+---------------------------
+1. Press Windows key + R
+2. Type "taskschd.msc" and press Enter
+3. Task Scheduler will open
+
+STEP 2: Create Basic Task
+------------------------
+1. In the right panel, click "Create Basic Task..."
+2. Name: "MN Notice Scraper"
+3. Description: "Daily scraper for MN public notices"
+4. Click "Next"
+
+STEP 3: Set Trigger (When to Run)
+---------------------------------
+1. Select "Daily"
+2. Click "Next"
+3. Set Start date to today or tomorrow
+4. Set Start time to 8:00 AM (or your preferred time)
+5. Recur every: 1 days
+6. Click "Next"
+
+STEP 4: Set Action (What to Run)
+-------------------------------
+1. Select "Start a program"
+2. Click "Next"
+3. Program/script: Browse to your "run_scraper.bat" file
+4. Start in: Browse to the folder containing all your scraper files
+5. Click "Next"
+
+STEP 5: Review and Finish
+------------------------
+1. Review all settings
+2. Check "Open the Properties dialog" checkbox
+3. Click "Finish"
+
+STEP 6: Important Settings
+-------------------------
+1. In Properties dialog, go to "General" tab
+2. Check "Run whether user is logged on or not"
+3. Check "Run with highest privileges"
+4. Go to "Settings" tab
+5. Check "Run task as soon as possible after a scheduled start is missed"
+6. Uncheck "Stop the task if it runs longer than" (or set to 2 hours)
+7. Click "OK"
+
+FOR MAC USERS - CRON JOBS
+=========================
+
+STEP 1: Open Terminal
+---------------------
+1. Press Cmd + Space
+2. Type "Terminal" and press Enter
+
+STEP 2: Edit Crontab
+-------------------
+1. Type: crontab -e
+2. Press "i" to enter insert mode (if using vi editor)
+
+STEP 3: Add Cron Job
+-------------------
+Add this line (replace /path/to/scraper with your actual folder path):
+0 8 * * * cd /path/to/scraper && ./run_scraper.sh >> scraper.log 2>&1
+
+This runs at 8:00 AM every day and saves output to scraper.log
+
+STEP 4: Save and Exit
+--------------------
+1. Press Escape key
+2. Type ":wq" and press Enter (to write and quit)
+
+ALTERNATIVE FOR MAC - AUTOMATOR
+==============================
+
+STEP 1: Open Automator
+----------------------
+1. Open Applications folder
+2. Double-click Automator
+
+STEP 2: Create Application
+-------------------------
+1. Choose "Application" template
+2. Click "Choose"
+
+STEP 3: Add Shell Script Action
+------------------------------
+1. Search for "Run Shell Script"
+2. Drag it to the workflow area
+3. In the script box, type:
+   cd /path/to/your/scraper/folder
+   ./run_scraper.sh
+
+STEP 4: Save Application
+-----------------------
+1. File > Save
+2. Name it "Daily Scraper"
+3. Save to Applications folder
+
+STEP 5: Schedule with Calendar
+-----------------------------
+1. Open Calendar app
+2. Create new event for 8:00 AM daily
+3. Set alert to "Open file" and choose your "Daily Scraper" app
+
+CHECKING IF AUTOMATION IS WORKING
+=================================
+
+WINDOWS:
+--------
+1. Check Task Scheduler History tab
+2. Look for "Task completed" events
+3. Check the csvs folder for new files with yesterday's date
+
+MAC:
+----
+1. Check scraper.log file for output (if using cron)
+2. Check the csvs folder for new files with yesterday's date
+3. For Automator: Check if the app ran in Activity Monitor
+
+TROUBLESHOOTING AUTOMATION
+==========================
+
+Common Issues:
+- Task runs but no output: Check file paths are correct
+- Permission denied: Make sure user has admin privileges (Windows) or file is executable (Mac)
+- Missing files: Ensure all scraper files are in the same folder
+- API errors: Check that your 2captcha and OpenAI accounts have sufficient credit
+
+Testing:
+- Run the task manually first to make sure it works
+- Check that the batch file/shell script runs when double-clicked
+- Verify all file paths are absolute paths, not relative
+
+MONITORING YOUR AUTOMATION
+==========================
+
+What to Check Daily:
+1. New CSV file created in csvs folder with yesterday's date
+2. File contains 200-300+ records (typical daily volume)
+3. No error messages in logs
+
+What to Check Weekly:
+1. 2captcha account balance (should decrease slowly)
+2. OpenAI account balance (should decrease slowly)
+3. Mullvad VPN still connected and working
+
+What to Check Monthly:
+1. Refill 2captcha account if balance is low
+2. Refill OpenAI account if balance is low
+3. Pay Mullvad VPN subscription
+
+Remember: The scraper automatically searches for YESTERDAY's notices, so if you run it on September 5th, it will get September 4th data.

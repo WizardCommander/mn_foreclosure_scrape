@@ -1,6 +1,9 @@
 *.csv
-*.md
-*.txt
+todo.md
+CLAUDE.md
+page_source.md
+notice_page_source.md
+overview.txt
 .env
 DEVELOPMENT_SUMMARY.md
 __pycache__/

@@ -4,7 +4,7 @@ MN Public Notice Scraper
 Scrapes foreclosure and bankruptcy notices from mnpublicnotice.com
 """
 
-from playwright.sync_api import sync_playwright, Page, Browser, BrowserContext
+from playwright.sync_api import sync_playwright
 import csv
 import re
 from datetime import datetime, timedelta
@@ -14,7 +14,6 @@ import os
 import glob
 import random
 import gc
-from urllib.parse import urlparse
 from mullvad_manager import MullvadManager
 
 logging.basicConfig(
@@ -214,46 +213,38 @@ class MNNoticeScraperClean:
             logger.error(f"Failed to setup Playwright browser: {e}")
             raise
 
-    def search_notices(self, keyword, days_back=1):
-        """Navigate to search page and perform search"""
-        logger.info(
-            f"🔍 Searching for '{keyword}' (last {days_back} day{'s' if days_back > 1 else ''})"
-        )
-
-        # Navigate to search page
-        self.page.goto(self.search_url)
-
-        # Wait for page to fully load
-        self.page.wait_for_selector("form")
-        time.sleep(3)
-
-        # Set date range - always search for yesterday's notices
+    def _calculate_search_dates(self):
+        """Calculate search dates - pure function for easy testing"""
         end_date = datetime.now() - timedelta(days=1)  # Yesterday
         start_date = end_date  # Search for yesterday's notices only
-        self._search_date = start_date  # Store search date for CSV filename
-        logger.info(f"🗓️ Searching for notices on {start_date.strftime('%m/%d/%Y')}")
+        return start_date, end_date
 
-        # Fill in keyword field
+    def _fill_keyword_field(self, keyword):
+        """Fill in keyword field"""
         try:
             keyword_field = self.page.wait_for_selector("input[type='text']")
             keyword_field.fill(keyword)  # fill() auto-clears in Playwright
-        # Reduced logging for form filling
+            return True
         except Exception as e:
             logger.warning(f"Error with keyword field: {e}")
+            return False
 
-        # Set "Any Words" radio button
+    def _set_any_words_radio(self):
+        """Set 'Any Words' radio button"""
         try:
             any_words_radio = self.page.wait_for_selector(
                 "#ctl00_ContentPlaceHolder1_as1_rdoType_1"
             )
             if not any_words_radio.is_checked():
                 self.page.evaluate("(element) => element.click()", any_words_radio)
-                # Selected Any Words option
                 time.sleep(3)  # Wait for postback
+            return True
         except Exception as e:
             logger.warning(f"Error with 'Any Words' radio button: {e}")
+            return False
 
-        # Fill date fields
+    def _fill_date_fields(self, start_date, end_date):
+        """Fill date fields"""
         try:
             # Open date range selector
             date_range_div = self.page.wait_for_selector(
@@ -280,25 +271,57 @@ class MNNoticeScraperClean:
 
                 if "from" in field_name.lower() or "from" in field_id.lower():
                     input_field.fill(start_date.strftime("%m/%d/%Y"))
-                    pass  # Set from date
+                    input_field.fill(start_date.strftime("%m/%d/%Y"))
                 elif "to" in field_name.lower() or "to" in field_id.lower():
                     input_field.fill(end_date.strftime("%m/%d/%Y"))
-                    pass  # Set to date
+                    input_field.fill(end_date.strftime("%m/%d/%Y"))
 
+            return True
         except Exception as e:
             logger.warning(f"Error setting date fields: {e}")
+            return False
 
-        # Click search button
+    def _click_search_button(self):
+        """Click search button and wait for results"""
         try:
             search_button = self.page.wait_for_selector(
                 "#ctl00_ContentPlaceHolder1_as1_btnGo"
             )
             search_button.click()
-            # Search submitted
             time.sleep(5)  # Wait for results
             return True
         except Exception as e:
             logger.error(f"Error clicking search button: {e}")
+            return False
+
+    def search_notices(self, keyword, days_back=1):
+        """Navigate to search page and perform search - orchestrates extracted functions"""
+        logger.info(
+            f"🔍 Searching for '{keyword}' (last {days_back} day{'s' if days_back > 1 else ''})"
+        )
+
+        # Navigate to search page
+        self.page.goto(self.search_url)
+
+        # Wait for page to fully load
+        self.page.wait_for_selector("form")
+        time.sleep(3)
+
+        # Calculate search dates
+        start_date, end_date = self._calculate_search_dates()
+        self._search_date = start_date  # Store search date for CSV filename
+        logger.info(f"🗓️ Searching for notices on {start_date.strftime('%m/%d/%Y')}")
+
+        # Execute search steps using extracted functions
+        success = True
+        success &= self._fill_keyword_field(keyword)
+        success &= self._set_any_words_radio()
+        success &= self._fill_date_fields(start_date, end_date)
+        
+        if success:
+            return self._click_search_button()
+        else:
+            logger.error("Search form preparation failed")
             return False
 
     def set_results_per_page(self, per_page=50):
@@ -313,7 +336,7 @@ class MNNoticeScraperClean:
 
             # Check current selection (for select elements, use get_attribute)
             current_selection = results_dropdown.get_attribute("value")
-            logger.debug(f"🔍 DEBUG: Current results per page: {current_selection}")
+            logger.debug(f"Current results per page: {current_selection}")
 
             if current_selection == str(per_page):
                 logger.info(f"Results per page already set to {per_page}")
@@ -333,7 +356,7 @@ class MNNoticeScraperClean:
             )
             actual_count = len(view_buttons)
             logger.info(
-                f"🔍 DEBUG: After setting per_page={per_page}, found {actual_count} buttons"
+                f"After setting per_page={per_page}, found {actual_count} buttons"
             )
 
             return True
@@ -358,7 +381,7 @@ class MNNoticeScraperClean:
                 "#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1 input[id*='btnView2'].viewButton"
             )
 
-            logger.debug(f"🔍 DEBUG: Found {len(view_buttons)} view buttons")
+            logger.debug(f"Found {len(view_buttons)} view buttons")
 
             # Extract and log button IDs from onclick events for debugging
             button_ids = []
@@ -375,10 +398,10 @@ class MNNoticeScraperClean:
                     button_ids.append(f"error_{i}")
 
             logger.debug(
-                f"🔍 DEBUG: Button IDs found: {button_ids[:10]}{'...' if len(button_ids) > 10 else ''}"
+                f"Button IDs found: {button_ids[:10]}{'...' if len(button_ids) > 10 else ''}"
             )
             logger.debug(
-                f"🔍 DEBUG: Unique IDs: {len(unique_ids)} out of {len(button_ids)} buttons"
+                f"Unique IDs: {len(unique_ids)} out of {len(button_ids)} buttons"
             )
 
             # Validate we have diverse button IDs (not all the same)
@@ -1310,7 +1333,7 @@ class MNNoticeScraperClean:
 
                     # Extract data
                     current_url = self.page.url
-                    logger.debug(f"🔍 DEBUG: Current URL: {current_url}")
+                    logger.debug(f"Current URL: {current_url}")
 
                     # Extract notice ID from URL for additional duplicate checking
                     url_id_match = re.search(r"ID=([0-9]+)", current_url)
@@ -1360,7 +1383,7 @@ class MNNoticeScraperClean:
                             f"❌ All navigation attempts failed after notice {notice_id}"
                         )
                         logger.error(
-                            f"📊 Partial results: Successfully processed {len(self.results)} notices"
+                            f"📊 Partial results: Successfully processed {self.records_written} notices"
                         )
 
                         # Try one last recovery attempt - full session restoration
@@ -1511,12 +1534,12 @@ class MNNoticeScraperClean:
             notice_id = result.get("notice_id", "unknown")
             if notice_id in seen_ids:
                 duplicate_count += 1
-                logger.warning(f"🔍 DEBUG: Duplicate in final results - ID {notice_id}")
+                logger.warning(f"Duplicate in final results - ID {notice_id}")
             seen_ids.add(notice_id)
 
         if duplicate_count > 0:
             logger.warning(
-                f"🔍 DEBUG: Found {duplicate_count} duplicates in final results"
+                f"Found {duplicate_count} duplicates in final results"
             )
 
         logger.info(f"📁 Saved {len(self.results)} records to {filename}")
@@ -1633,9 +1656,9 @@ def main():
                 )
 
         # Rate limiting summary
-        if len(scraper.results) > 0:
+        if scraper.records_written > 0:
             avg_delay = (scraper.min_delay + scraper.max_delay) / 2
-            total_minutes = (len(scraper.results) * avg_delay) / 60
+            total_minutes = (scraper.records_written * avg_delay) / 60
             print(
                 f"🐌 Rate limiting added ~{total_minutes:.1f} minutes to prevent IP blocks"
             )

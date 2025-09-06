@@ -1,0 +1,80 @@
+MN PUBLIC NOTICE SCRAPER - COMPLETE SETUP GUIDE
+==============================================
+
+Follow these steps in order to get the scraper running on your computer.
+
+WHAT YOU NEED
+-------------
+- A Windows or Mac computer
+- Internet connection
+- Credit card for API services (about $10-20/month total)
+
+STEP 1: INSTALL MULLVAD VPN
+---------------------------
+1. Go to https://mullvad.net/en/account/create/
+2. Create an account (costs $5/month, helps avoid IP blocking)
+3. Download Mullvad app for your operating system:
+   - Windows: Download from mullvad.net
+   - Mac: Download from mullvad.net
+4. Install the app and log in with your account
+5. TEST: Make sure you can connect to a US server
+
+STEP 2: GET 2CAPTCHA API KEY
+---------------------------
+1. Go to https://2captcha.com/
+2. Click "Register" to create an account
+3. Add funds to your account ($10 should last several months)
+4. Go to your account dashboard
+5. Find your "API Key" - it looks like: 1abc2def3ghi4jkl5mno6pqr7stu8vwx
+6. WRITE DOWN YOUR API KEY - you'll need it in Step 4
+
+STEP 3: GET OPENAI API KEY
+-------------------------
+1. Go to https://platform.openai.com/
+2. Create an account or log in
+3. Go to API Keys section
+4. Create a new API key
+5. The key looks like: sk-proj-abc123def456...
+6. WRITE DOWN YOUR API KEY - you'll need it in Step 4
+7. Add $5-10 credit to your account (should last several months)
+
+STEP 4: RUN THE SCRAPER
+----------------------
+1. Download all the scraper files to a folder on your computer
+2. Double-click "run_scraper.bat" (Windows) or "run_scraper.sh" (Mac)
+3. The first time it runs, it will:
+   - Install Python if you don't have it
+   - Install required software packages
+   - Ask for your 2captcha API key (paste it in)
+   - Ask for your OpenAI API key (paste it in)
+4. When everything is ready, it will say "Press Enter to start scrape"
+5. Press Enter and wait for it to finish
+6. Results will be saved in the "csvs" folder
+
+MONTHLY COSTS
+-------------
+- Mullvad VPN: $5/month
+- 2captcha: $2-5/month (depends on usage)
+- OpenAI: $3-10/month (depends on usage)
+- Total: About $10-20/month
+
+WHAT HAPPENS DAILY
+-----------------
+The scraper automatically looks for notices from yesterday's date.
+If today is September 5th, it searches for September 4th notices.
+It typically finds 200-300 notices and saves them to a CSV file.
+
+NEXT STEPS
+----------
+- See DAILY_USE.txt for how to run it every day
+- See AUTOMATION_GUIDE.txt to set up automatic daily running
+- See TROUBLESHOOTING.txt if you have problems
+
+IMPORTANT NOTES
+--------------
+- Keep your API keys private and secure
+- The scraper is designed to be respectful to the website
+- Results are saved with yesterday's date in the filename
+- Each run creates a new CSV file - old files are NOT deleted
+
+If you have any problems, check TROUBLESHOOTING.txt first.

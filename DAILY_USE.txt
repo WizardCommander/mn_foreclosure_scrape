@@ -1,0 +1,137 @@
+DAILY USE GUIDE
+===============
+
+This is your simple guide for running the scraper every day.
+
+HOW TO RUN THE SCRAPER
+======================
+
+FOR WINDOWS:
+-----------
+1. Double-click "run_scraper.bat" in your scraper folder
+2. Wait for it to check everything (takes 1-2 minutes)
+3. When you see "Press Enter to start scraping..." press Enter
+4. Wait for it to finish (usually 15-25 minutes)
+5. Check the "csvs" folder for your results
+
+FOR MAC:
+-------
+1. Double-click "run_scraper.sh" in your scraper folder
+2. Wait for it to check everything (takes 1-2 minutes) 
+3. When you see "Press Enter to start scraping..." press Enter
+4. Wait for it to finish (usually 15-25 minutes)
+5. Check the "csvs" folder for your results
+
+WHAT TO EXPECT
+=============
+
+Typical Daily Results:
+- 200-300 notices found and processed
+- Results saved to CSV file named with yesterday's date
+- Example: mn_notices_2025-09-04.csv (contains data from September 4th)
+
+Runtime:
+- 15-25 minutes for a full run
+- Longer on busy days (more notices to process)
+- Shorter on weekends/holidays (fewer notices)
+
+What You'll See:
+- Progress messages showing which notice is being processed
+- "Captcha solved" messages (this is normal)
+- VPN connection status
+- Final summary with number of records saved
+
+UNDERSTANDING THE OUTPUT
+=======================
+
+CSV File Columns:
+- first_name: Person's first name
+- last_name: Person's last name  
+- street: Street address
+- city: City
+- state: State (always MN)
+- zip: ZIP code
+- date_filed: When the notice was filed
+- plaintiff: Who filed the notice (bank, creditor, etc.)
+- link: Link to the original notice
+- notice_id: Internal ID number
+
+Good Daily Run:
+- File created in csvs folder
+- 200-300 records (typical)
+- Recent date in filename
+- No major error messages
+
+IMPORTANT REMINDERS
+==================
+
+ALWAYS USE VPN:
+- Make sure Mullvad VPN is connected before running
+- Check VPN status in the startup messages
+- WITHOUT VPN: You will get IP banned for 2+ days
+- The scraper tells you if VPN is working
+
+Run Once Per Day:
+- The scraper automatically gets YESTERDAY'S notices
+- Running multiple times per day gets the same data
+- Daily automation is recommended (see AUTOMATION_GUIDE.txt)
+
+Check Your Balances:
+- 2captcha account: Should decrease slowly ($2-5/month)
+- OpenAI account: Should decrease slowly ($3-10/month)
+- Mullvad VPN: $5/month subscription
+
+WHEN THINGS GO WRONG
+===================
+
+No CSV File Created:
+- Check for error messages in the scraper output
+- Verify VPN is connected
+- Check if you're IP banned (see TROUBLESHOOTING.txt)
+
+Empty or Small CSV File:
+- Normal on weekends/holidays (courts closed)
+- Check the date - some days have fewer notices
+- Verify API keys are working
+
+Scraper Runs But Stops Early:
+- Usually an IP ban or connection issue
+- Check VPN status
+- Wait and try again later
+
+Many Captcha Failures:
+- Check 2captcha account balance
+- 2captcha service might be slow (normal occasionally)
+
+MONTHLY MAINTENANCE
+==================
+
+Check Every Month:
+1. 2captcha account balance - add funds if low
+2. OpenAI account balance - add credits if low  
+3. Mullvad VPN subscription - auto-renews usually
+4. Clear old CSV files if you have many (optional)
+
+Signs Everything is Working:
+- New CSV file every day with yesterday's date
+- 200-300 records per file (typical)
+- No error messages
+- VPN connects successfully
+
+DAILY WORKFLOW EXAMPLE
+======================
+
+Morning Routine (if running manually):
+1. Check that Mullvad VPN is running
+2. Double-click run_scraper.bat (or .sh)
+3. Press Enter when prompted
+4. Go have coffee - come back in 20-30 minutes
+5. Check csvs folder for new file
+6. Import CSV into your lead management system
+
+Automated (recommended):
+1. Set up automation (see AUTOMATION_GUIDE.txt)
+2. Check csvs folder each morning for new file
+3. File will be there automatically from overnight run
+
+The scraper is designed to be reliable and hands-off once properly set up. Most problems are solved by ensuring VPN is connected and API accounts have sufficient funds.
