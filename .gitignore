@@ -6,6 +6,7 @@ notice_page_source.md
 overview.txt
 .env
 DEVELOPMENT_SUMMARY.md
+test_*.py
 __pycache__/
 */__pycache__
 
