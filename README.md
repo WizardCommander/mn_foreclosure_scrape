@@ -81,7 +81,7 @@ MN_Notice_Scraper/
 
 ## Performance
 
-- **Runtime**: 15-25 minutes for typical daily batch (200-300 notices)
+- **Runtime**: 1 hour+ for typical daily batch (200-300 notices)
 - **Success Rate**: 95%+ captcha solving, 90%+ data extraction
 - **Data Quality**: AI parsing eliminates formatting artifacts
 - **Reliability**: Enterprise-grade error handling with automatic recovery

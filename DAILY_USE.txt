@@ -11,7 +11,7 @@ FOR WINDOWS:
 1. Double-click "run_scraper.bat" in your scraper folder
 2. Wait for it to check everything (takes 1-2 minutes)
 3. When you see "Press Enter to start scraping..." press Enter
-4. Wait for it to finish (usually 15-25 minutes)
+4. Wait for it to finish (usually 1 hour+)
 5. Check the "csvs" folder for your results
 
 FOR MAC:
@@ -19,7 +19,7 @@ FOR MAC:
 1. Double-click "run_scraper.sh" in your scraper folder
 2. Wait for it to check everything (takes 1-2 minutes) 
 3. When you see "Press Enter to start scraping..." press Enter
-4. Wait for it to finish (usually 15-25 minutes)
+4. Wait for it to finish (usually 1 hour+)
 5. Check the "csvs" folder for your results
 
 WHAT TO EXPECT
@@ -31,7 +31,7 @@ Typical Daily Results:
 - Example: mn_notices_2025-09-04.csv (contains data from September 4th)
 
 Runtime:
-- 15-25 minutes for a full run
+- 1 hour+ for a full run
 - Longer on busy days (more notices to process)
 - Shorter on weekends/holidays (fewer notices)
 
@@ -125,13 +125,13 @@ Morning Routine (if running manually):
 1. Check that Mullvad VPN is running
 2. Double-click run_scraper.bat (or .sh)
 3. Press Enter when prompted
-4. Go have coffee - come back in 20-30 minutes
+4. Walk away or let it scrape in the background (for about 1 hour)
 5. Check csvs folder for new file
 6. Import CSV into your lead management system
 
 Automated (recommended):
 1. Set up automation (see AUTOMATION_GUIDE.txt)
 2. Check csvs folder each morning for new file
-3. File will be there automatically from overnight run
+3. File will be there automatically from overnight run (if computer was powered on)
 
-The scraper is designed to be reliable and hands-off once properly set up. Most problems are solved by ensuring VPN is connected and API accounts have sufficient funds.
+The scraper is designed to be reliable and hands-off once properly set up. Most problems are solved by ensuring VPN is connected making sure API accounts have sufficient funds, and retrying a scrape if something goes wrong.
