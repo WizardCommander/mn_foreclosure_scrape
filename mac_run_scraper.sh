@@ -233,7 +233,7 @@ echo "==============================================="
 echo
 echo "The scraper will search for notices from yesterday's date."
 echo "Results will be saved to the 'csvs' folder."
-echo "This typically takes 15-25 minutes to complete."
+echo "This typically takes 1 hour+ to complete."
 echo
 read -p "Press Enter to start scraping..."
 

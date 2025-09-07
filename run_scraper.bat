@@ -80,49 +80,28 @@ echo.
 
 REM Check for .env file and API keys
 echo [5/6] Checking API configuration...
-if not exist ".env" (
+if exist "%~dp0.env" (
+    echo .env file found
+) else (
     echo .env file not found. Setting up API keys...
     echo.
     echo You need two API keys to run this scraper:
-    echo 1. 2captcha API key (for solving captchas)
-    echo 2. OpenAI API key (for text processing)
+    echo 1. 2captcha API key for solving captchas
+    echo 2. OpenAI API key for text processing
     echo.
     echo See SETUP_GUIDE.txt for instructions on getting these keys.
     echo.
-    
     set /p captcha_key=Enter your 2captcha API key: 
     set /p openai_key=Enter your OpenAI API key: 
-    
     echo TWO_CAPTCHA_API_KEY=!captcha_key!> .env
     echo OPENAI_API_KEY=!openai_key!>> .env
-    
     echo API keys saved to .env file
-) else (
-    echo .env file found
 )
 echo.
 
 REM Test API keys
 echo Testing API connections...
-python -c "
-import os
-from dotenv import load_dotenv
-load_dotenv()
-
-# Test 2captcha key
-captcha_key = os.getenv('TWO_CAPTCHA_API_KEY')
-if not captcha_key or len(captcha_key) < 10:
-    print('Warning: 2captcha API key appears invalid')
-else:
-    print('2captcha API key format looks good')
-
-# Test OpenAI key  
-openai_key = os.getenv('OPENAI_API_KEY')
-if not openai_key or not openai_key.startswith('sk-'):
-    print('Warning: OpenAI API key appears invalid')
-else:
-    print('OpenAI API key format looks good')
-"
+python test_api_keys.py
 echo.
 
 REM Check Mullvad VPN
@@ -149,7 +128,7 @@ echo ===============================================
 echo.
 echo The scraper will search for notices from yesterday's date.
 echo Results will be saved to the 'csvs' folder.
-echo This typically takes 15-25 minutes to complete.
+echo This typically takes 1 hour+ to complete.
 echo.
 pause
 
