@@ -92,6 +92,15 @@ class GPTParser:
             # Check if GPT parsing was successful
             if self._is_meaningful_data(parsed_data):
                 logger.debug("✅ GPT parsing successful")
+                
+                # Add regex-extracted date to GPT results
+                regex_date = self._extract_date_with_regex(notice_text)
+                if regex_date:
+                    parsed_data['date_of_sale'] = regex_date
+                    logger.info(f"🗓️  REGEX found date_of_sale: '{regex_date}'")
+                else:
+                    logger.info("🗓️  REGEX could not find date of sale")
+                
                 return parsed_data
             else:
                 logger.warning("⚠️ GPT returned empty/invalid data, using regex fallback")
@@ -107,6 +116,22 @@ class GPTParser:
         """Check if parsed data contains meaningful information"""
         # At least first name or last name should be present
         return bool(data.get('first_name') or data.get('last_name'))
+    
+    def _extract_date_with_regex(self, text: str) -> str:
+        """Extract date of sale using regex patterns"""
+        # Pattern for "DATE AND TIME OF SALE: September 23, 2025" format
+        patterns = [
+            r'DATE\s+(?:AND\s+TIME\s+)?OF\s+SALE:?\s*([A-Za-z]+ \d{1,2}, \d{4})',
+            r'DATE\s+(?:AND\s+TIME\s+)?OF\s+SALE:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})',
+            r'DATE\s+(?:AND\s+TIME\s+)?OF\s+SALE:?\s*(\d{4}[/-]\d{1,2}[/-]\d{1,2})',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                return match.group(1).strip()
+        
+        return ""
     
     def _clean_notice_text(self, text: str) -> str:
         """Clean notice text for GPT processing"""
@@ -140,7 +165,6 @@ Extract these fields:
 - street: Property street address (number and street name)
 - city: Property city
 - zip: Property ZIP code
-- date_filed: Date the notice was filed (format: MM/DD/YYYY if possible)
 - plaintiff: The creditor/bank/financial institution name
 
 Return ONLY valid JSON in this exact format:
@@ -150,7 +174,6 @@ Return ONLY valid JSON in this exact format:
     "street": "123 Main St",
     "city": "Minneapolis",
     "zip": "55401",
-    "date_filed": "12/31/2024",
     "plaintiff": "First National Bank"
 }}
 
@@ -166,7 +189,7 @@ If a field cannot be found, use an empty string "".
                 json_str = json_match.group(0)
                 data = json.loads(json_str)
                 
-                # Ensure all required fields exist
+                # Ensure all required fields exist (no date - handled by regex)
                 result = {
                     'first_name': str(data.get('first_name', '')).strip(),
                     'last_name': str(data.get('last_name', '')).strip(),
@@ -174,7 +197,7 @@ If a field cannot be found, use an empty string "".
                     'city': str(data.get('city', '')).strip(),
                     'state': 'MN',  # Always MN for this scraper
                     'zip': str(data.get('zip', '')).strip(),
-                    'date_filed': str(data.get('date_filed', '')).strip(),
+                    'date_of_sale': '',  # Will be filled by regex
                     'plaintiff': str(data.get('plaintiff', '')).strip(),
                     'link': source_url
                 }
@@ -214,14 +237,22 @@ If a field cannot be found, use an empty string "".
             else:
                 logger.debug("📝 Regex could not find address")
             
-            # Simple date extraction
-            date_pattern = r'(\d{1,2}/\d{1,2}/\d{4})'
-            match = re.search(date_pattern, text)
+            # Extract date of sale from "DATE AND TIME OF SALE:" pattern
+            # Look for patterns like "DATE AND TIME OF SALE: September 23, 2025 at 10:00 AM"
+            date_of_sale_pattern = r'DATE\s+(?:AND\s+TIME\s+)?OF\s+SALE:?\s*([A-Za-z]+ \d{1,2}, \d{4})'
+            match = re.search(date_of_sale_pattern, text, re.IGNORECASE)
             if match:
-                data['date_filed'] = match.group(1)
-                logger.debug(f"📝 Regex found date: {data['date_filed']}")
+                data['date_of_sale'] = match.group(1)
+                logger.info(f"🗓️  REGEX found date of sale: '{data['date_of_sale']}'")
             else:
-                logger.debug("📝 Regex could not find date")
+                # Fallback to simple date pattern
+                date_pattern = r'(\d{1,2}/\d{1,2}/\d{4})'
+                match = re.search(date_pattern, text)
+                if match:
+                    data['date_of_sale'] = match.group(1)
+                    logger.info(f"🗓️  REGEX fallback date: '{data['date_of_sale']}'")
+                else:
+                    logger.info("🗓️  REGEX could not find any date of sale")
                 
             # Simple plaintiff extraction
             plaintiff_pattern = r'(?:MORTGAGEE|CREDITOR|PLAINTIFF):\s*([^,\n<]+)'
@@ -246,7 +277,7 @@ If a field cannot be found, use an empty string "".
             'city': '',
             'state': 'MN',
             'zip': '',
-            'date_filed': '',
+            'date_of_sale': '',
             'plaintiff': '',
             'link': source_url
         }
