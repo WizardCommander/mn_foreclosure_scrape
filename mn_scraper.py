@@ -115,8 +115,8 @@ class MNNoticeScraperClean:
         elif not self.twocaptcha_api_key:
             logger.warning("⚠️  No 2captcha API key - image captchas will be skipped")
 
-        # VPN Management
-        self.vpn_manager = MullvadManager(enabled=True)  # Set to False to disable VPN
+        # VPN Management - Disable auto_connect to prevent early connection issues
+        self.vpn_manager = MullvadManager(enabled=True, auto_connect=False)  # Set enabled=False to disable VPN
 
         self.setup_browser(headless)
 
@@ -1184,13 +1184,13 @@ class MNNoticeScraperClean:
         """Main scraping function with pagination support"""
         logger.info(f"Starting scrape for keywords: {keywords}")
 
-        # Verify VPN connection before scraping
+        # Ensure VPN connection before scraping (with better retry logic)
         if hasattr(self, "vpn_manager") and self.vpn_manager.enabled:
-            if not self.vpn_manager.verify_connection():
-                logger.error("❌ VPN connection verification failed - aborting scrape")
+            if not self.vpn_manager.ensure_connected():
+                logger.error("❌ VPN connection could not be established - aborting scrape")
                 return
             else:
-                logger.info(f"✅ VPN verified: {self.vpn_manager.get_status()}")
+                logger.info(f"✅ VPN ready for scraping: {self.vpn_manager.get_status()}")
 
         combined_keywords = " ".join(keywords)
 
