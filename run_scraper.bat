@@ -122,6 +122,19 @@ if errorlevel 1 (
 )
 echo.
 
+REM VPN Usage Prompt
+echo Do you want to use Mullvad VPN for this scraping session?
+echo (VPN helps avoid IP blocking but requires Mullvad to be installed)
+choice /c YN /n /m "Use VPN (Y/N): "
+if errorlevel 2 (
+    echo VPN disabled for this session
+    set MULLVAD_ENABLED=false
+) else (
+    echo VPN enabled for this session
+    set MULLVAD_ENABLED=true
+)
+echo.
+
 echo ===============================================
 echo    READY TO SCRAPE
 echo ===============================================

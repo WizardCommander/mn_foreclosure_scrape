@@ -116,7 +116,9 @@ class MNNoticeScraperClean:
             logger.warning("⚠️  No 2captcha API key - image captchas will be skipped")
 
         # VPN Management - Disable auto_connect to prevent early connection issues
-        self.vpn_manager = MullvadManager(enabled=True, auto_connect=False)  # Set enabled=False to disable VPN
+        self.vpn_manager = MullvadManager(
+            enabled=True, auto_connect=False
+        )  # Set enabled=False to disable VPN
 
         self.setup_browser(headless)
 
@@ -317,7 +319,7 @@ class MNNoticeScraperClean:
         success &= self._fill_keyword_field(keyword)
         success &= self._set_any_words_radio()
         success &= self._fill_date_fields(start_date, end_date)
-        
+
         if success:
             return self._click_search_button()
         else:
@@ -1187,10 +1189,18 @@ class MNNoticeScraperClean:
         # Ensure VPN connection before scraping (with better retry logic)
         if hasattr(self, "vpn_manager") and self.vpn_manager.enabled:
             if not self.vpn_manager.ensure_connected():
-                logger.error("❌ VPN connection could not be established - aborting scrape")
-                return
+                logger.warning(
+                    "⚠️ VPN connection could not be established - continuing without VPN protection"
+                )
+                logger.warning(
+                    "📝 Note: Scraping without VPN may result in IP blocking if running frequently"
+                )
             else:
-                logger.info(f"✅ VPN ready for scraping: {self.vpn_manager.get_status()}")
+                logger.info(
+                    f"✅ VPN ready for scraping: {self.vpn_manager.get_status()}"
+                )
+        else:
+            logger.info("🌐 VPN disabled - scraper running without IP protection")
 
         combined_keywords = " ".join(keywords)
 
@@ -1538,9 +1548,7 @@ class MNNoticeScraperClean:
             seen_ids.add(notice_id)
 
         if duplicate_count > 0:
-            logger.warning(
-                f"Found {duplicate_count} duplicates in final results"
-            )
+            logger.warning(f"Found {duplicate_count} duplicates in final results")
 
         logger.info(f"📁 Saved {len(self.results)} records to {filename}")
         return full_path
