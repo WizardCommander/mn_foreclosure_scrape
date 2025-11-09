@@ -2,3 +2,5 @@ playwright
 2captcha-python
 python-dotenv
 openai
+requests
+beautifulsoup4

@@ -1,6 +1,7 @@
 *.csv
 todo.md
 CLAUDE.md
+AGENTS.md
 page_source.md
 notice_page_source.md
 overview.txt
@@ -9,6 +10,8 @@ DEVELOPMENT_SUMMARY.md
 nul
 __pycache__/
 */__pycache__
+*.pdf
+star tribune structure report.txt
 
 # Chrome profile data and extensions
 chrome_profile_buster/
@@ -21,3 +24,6 @@ extensions/
 # User data directories  
 user_data/
 User Data/
+
+# tests
+tests/*

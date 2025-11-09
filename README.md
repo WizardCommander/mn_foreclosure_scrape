@@ -13,9 +13,15 @@ The launcher will automatically:
 - Set up API keys (first time only)
 - Run the scraper
 
+When the Python script starts you'll be prompted to pick which source(s) to scrape:
+1. **MN Public Notice** (`mnpublicnotice.com`)
+2. **Star Tribune Foreclosures** (`classifieds.startribune.com`)
+3. **Both** (runs sequentially)
+
 ## What It Does
 
 - Searches for foreclosure and bankruptcy notices from **yesterday's date**
+- Supports statewide results from both MN Public Notice and Star Tribune classifieds
 - Automatically solves reCAPTCHA challenges using 2captcha service
 - Extracts contact information using AI-powered text parsing
 - Processes multiple pages of results (typically 200-300+ notices per day)
@@ -42,6 +48,13 @@ Each record contains:
 - **OpenAI API** (~$3-10/month) - AI text parsing
 
 ### Total Monthly Cost: ~$10-20
+
+## Supported Sources
+
+- **MN Public Notice** – foreclosure & bankruptcy listings across Minnesota
+- **Star Tribune Foreclosures** – statewide foreclosure notices from the Star Tribune marketplace
+
+You can run either site independently or back-to-back from the CLI prompt.
 
 ## Setup Instructions
 

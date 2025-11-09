@@ -4,16 +4,20 @@ MN Public Notice Scraper
 Scrapes foreclosure and bankruptcy notices from mnpublicnotice.com
 """
 
-from playwright.sync_api import sync_playwright
+import argparse
 import csv
-import re
-from datetime import datetime, timedelta
-import time
+import gc
+import glob
 import logging
 import os
-import glob
 import random
-import gc
+import re
+import sys
+import time
+from datetime import datetime, timedelta
+from typing import Optional
+
+from playwright.sync_api import sync_playwright
 from mullvad_manager import MullvadManager
 
 logging.basicConfig(
@@ -34,6 +38,7 @@ except ImportError:
 
 # Import GPT parser after .env is loaded
 from gpt_parser import extract_notice_data_gpt, get_parsing_stats
+from star_tribune_scraper import StarTribuneScraper
 
 # 2captcha integration
 try:
@@ -1636,34 +1641,17 @@ class MNNoticeScraperClean:
             logger.warning(f"Error during cleanup: {e}")
 
 
-def main():
-    """
-    Main function to run the scraper
-    Set TWOCAPTCHA_API_KEY environment variable or pass it directly to the scraper
-    """
+def run_mn_public_notice_scrape(headless: bool):
     scraper = None
     try:
-        scraper = MNNoticeScraperClean(headless=False)
-
+        scraper = MNNoticeScraperClean(headless=headless)
         scraper.scrape_notices(["foreclosure", "bankruptcy"], days_back=1)
 
-        print(f"\n🎉 Scraping complete! CSV saved with immediate writing")
+        print(f"\n🎉 MN Public Notice scraping complete! CSV saved with immediate writing")
         print(f"📊 Total records extracted: {scraper.records_written}")
         print(f"✅ Captchas solved: {scraper.captcha_solved}")
         print(f"⏭️  Notices skipped due to unsolved captcha: {scraper.captcha_skipped}")
 
-        # Parsing statistics
-        parsing_stats = get_parsing_stats()
-        if parsing_stats["total_parses"] > 0:
-            print(
-                f"🤖 GPT parsing success rate: {parsing_stats['gpt_success_rate']}% ({parsing_stats['gpt_successful']}/{parsing_stats['total_parses']})"
-            )
-            if parsing_stats["regex_fallbacks"] > 0:
-                print(
-                    f"🔄 Regex fallbacks used: {parsing_stats['regex_fallbacks']} times"
-                )
-
-        # Rate limiting summary
         if scraper.records_written > 0:
             avg_delay = (scraper.min_delay + scraper.max_delay) / 2
             total_minutes = (scraper.records_written * avg_delay) / 60
@@ -1671,20 +1659,112 @@ def main():
                 f"🐌 Rate limiting added ~{total_minutes:.1f} minutes to prevent IP blocks"
             )
 
-        # Cost estimates
         if scraper.solver:
             print(
                 f"💰 Estimated 2captcha cost: ~${(scraper.captcha_solved * 0.003):.3f}"
             )
-        if parsing_stats["gpt_successful"] > 0:
-            gpt_cost = parsing_stats["gpt_successful"] * 0.002  # ~$0.002 per GPT call
-            print(f"🧠 Estimated GPT cost: ~${gpt_cost:.3f}")
-
     except Exception as e:
-        logger.error(f"Scraper failed: {e}")
+        logger.error(f"MN Public Notice scraper failed: {e}")
     finally:
         if scraper:
             scraper.close()
+
+
+def run_star_tribune_scrape():
+    scraper = None
+    try:
+        scraper = StarTribuneScraper()
+        scraper.scrape_latest_notices()
+        print("\n📰 Star Tribune scraping complete!")
+        print(f"📊 Total records extracted: {scraper.records_written}")
+        if scraper.output_path:
+            print(f"📁 CSV saved to: {scraper.output_path}")
+    except Exception as e:
+        logger.error(f"Star Tribune scraper failed: {e}")
+    finally:
+        if scraper:
+            scraper.close()
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        description="Scrape foreclosure notices from MN Public Notice and Star Tribune."
+    )
+    parser.add_argument(
+        "--site",
+        choices=["mn", "star", "both"],
+        help="Choose which site(s) to scrape. Defaults to interactive prompt.",
+    )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Run the MN Public Notice Playwright browser in headless mode.",
+    )
+    return parser.parse_args()
+
+
+def prompt_site_choice() -> str:
+    options = (
+        "\nSelect the site(s) to scrape:\n"
+        "  1) MN Public Notice (mnpublicnotice.com)\n"
+        "  2) Star Tribune Foreclosures (classifieds.startribune.com)\n"
+        "  3) Both\n"
+    )
+    print(options)
+    mapping = {"1": "mn", "2": "star", "3": "both"}
+    while True:
+        choice = input("Enter 1, 2, or 3 [default 1]: ").strip() or "1"
+        if choice in mapping:
+            return mapping[choice]
+        print("Please enter 1, 2, or 3.")
+
+
+def resolve_site_choice(cli_choice: Optional[str]) -> str:
+    if cli_choice:
+        return cli_choice
+
+    env_choice = os.getenv("SCRAPER_SITE_CHOICE")
+    if env_choice and env_choice.lower() in {"mn", "star", "both"}:
+        return env_choice.lower()
+
+    if not sys.stdin.isatty():
+        logger.info(
+            "🛈 No interactive terminal detected; defaulting to MN Public Notice."
+        )
+        return "mn"
+
+    return prompt_site_choice()
+
+
+def print_parsing_summary():
+    parsing_stats = get_parsing_stats()
+    if parsing_stats["total_parses"] == 0:
+        return
+
+    print(
+        f"\n🤖 GPT parsing success rate: {parsing_stats['gpt_success_rate']}% "
+        f"({parsing_stats['gpt_successful']}/{parsing_stats['total_parses']})"
+    )
+    if parsing_stats["regex_fallbacks"] > 0:
+        print(f"🔄 Regex fallbacks used: {parsing_stats['regex_fallbacks']} times")
+
+    gpt_cost = parsing_stats["gpt_successful"] * 0.002  # ~$0.002 per GPT call
+    if gpt_cost > 0:
+        print(f"🧠 Estimated GPT cost: ~${gpt_cost:.3f}")
+
+
+def main():
+    args = parse_arguments()
+    site_choice = resolve_site_choice(args.site)
+    run_mn = site_choice in {"mn", "both"}
+    run_star = site_choice in {"star", "both"}
+
+    if run_mn:
+        run_mn_public_notice_scrape(headless=args.headless)
+    if run_star:
+        run_star_tribune_scrape()
+
+    print_parsing_summary()
 
 
 if __name__ == "__main__":
