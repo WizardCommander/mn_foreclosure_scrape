@@ -10,7 +10,7 @@ REM Change to the directory where this batch file is located
 cd /d "%~dp0"
 
 REM Check if Python is installed and version is adequate
-echo [1/6] Checking Python installation...
+echo [1/5] Checking Python installation...
 python --version >nul 2>&1
 if errorlevel 1 (
     echo Python not found. Installing Python automatically...
@@ -43,7 +43,7 @@ if errorlevel 1 (
 echo.
 
 REM Check if pip is available
-echo [2/6] Checking pip...
+echo [2/5] Checking pip...
 pip --version >nul 2>&1
 if errorlevel 1 (
     echo pip not found. Please reinstall Python with pip included.
@@ -54,19 +54,22 @@ echo pip is available
 echo.
 
 REM Install/update Python packages
-echo [3/6] Installing/updating Python packages...
-pip install -r requirements.txt
+echo [3/5] Installing/updating Python packages...
+echo (This may take a few minutes on first run)
+pip install --progress-bar off --disable-pip-version-check -r requirements.txt
 if errorlevel 1 (
     echo Failed to install Python packages. Check your internet connection.
     pause
     exit /b 1
 )
+echo Packages installed successfully
 echo.
 
 REM Install Playwright browsers
-echo [4/6] Installing Playwright browsers...
+echo [4/5] Installing Playwright browsers...
 python -c "import playwright" >nul 2>&1
 if not errorlevel 1 (
+    echo (This downloads ~400MB and may take 5-10 minutes on first run)
     playwright install chromium --with-deps
     if errorlevel 1 (
         echo Warning: Playwright browser installation failed. Continuing anyway...
@@ -79,7 +82,7 @@ if not errorlevel 1 (
 echo.
 
 REM Check for .env file and API keys
-echo [5/6] Checking API configuration...
+echo [5/5] Checking API configuration...
 if exist "%~dp0.env" (
     echo .env file found
 ) else (
@@ -104,34 +107,29 @@ echo Testing API connections...
 python test_api_keys.py
 echo.
 
-REM Check Mullvad VPN
-echo [6/6] Checking Mullvad VPN...
-mullvad --help >nul 2>&1
-if errorlevel 1 (
-    echo Warning: Mullvad CLI not found
-    echo The scraper will work without VPN but may be slower
-    echo See SETUP_GUIDE.txt for Mullvad installation instructions
-) else (
-    echo Mullvad CLI found
-    mullvad status 2>nul | find "Connected" >nul
-    if not errorlevel 1 (
-        echo VPN Status: Connected
-    ) else (
-        echo VPN Status: Disconnected (will auto-connect when scraping starts)
-    )
-)
+REM Site Selection Prompt
+echo ===============================================
+echo    SITE SELECTION
+echo ===============================================
 echo.
-
-REM VPN Usage Prompt
-echo Do you want to use Mullvad VPN for this scraping session?
-echo (VPN helps avoid IP blocking but requires Mullvad to be installed)
-choice /c YN /n /m "Use VPN (Y/N): "
-if errorlevel 2 (
-    echo VPN disabled for this session
-    set MULLVAD_ENABLED=false
+echo Which site(s) would you like to scrape?
+echo   1. MN Public Notice only
+echo   2. Star Tribune only
+echo   3. Both sites
+echo.
+choice /c 123 /n /m "Select option (1/2/3): "
+if errorlevel 3 (
+    set SCRAPER_SITE_CHOICE=both
+    echo.
+    echo Selected: Both sites
+) else if errorlevel 2 (
+    set SCRAPER_SITE_CHOICE=star
+    echo.
+    echo Selected: Star Tribune only
 ) else (
-    echo VPN enabled for this session
-    set MULLVAD_ENABLED=true
+    set SCRAPER_SITE_CHOICE=mn
+    echo.
+    echo Selected: MN Public Notice only
 )
 echo.
 
@@ -141,7 +139,7 @@ echo ===============================================
 echo.
 echo The scraper will search for notices from yesterday's date.
 echo Results will be saved to the 'csvs' folder.
-echo This typically takes 1 hour+ to complete.
+echo This can take 1+ hours to complete.
 echo.
 pause
 
