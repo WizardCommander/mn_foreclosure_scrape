@@ -64,8 +64,8 @@ class StarTribuneScraper:
         self.csv_writer = None
         self.output_path: Optional[str] = None
 
-        # Reuse the same VPN management strategy as the MN scraper.
-        self.vpn_manager = MullvadManager(enabled=True, auto_connect=False)
+        # VPN Management - Disabled by default, controlled by MULLVAD_ENABLED env var
+        self.vpn_manager = MullvadManager(enabled=False, auto_connect=False)
 
     def _ensure_vpn(self):
         if hasattr(self, "vpn_manager") and self.vpn_manager.enabled:

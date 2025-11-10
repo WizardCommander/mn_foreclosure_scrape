@@ -122,15 +122,16 @@ class GPTParser:
         # Pattern for "DATE AND TIME OF SALE: September 23, 2025" format
         patterns = [
             r'DATE\s+(?:AND\s+TIME\s+)?OF\s+SALE:?\s*([A-Za-z]+ \d{1,2}, \d{4})',
-            r'DATE\s+(?:AND\s+TIME\s+)?OF\s+SALE:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})',
-            r'DATE\s+(?:AND\s+TIME\s+)?OF\s+SALE:?\s*(\d{4}[/-]\d{1,2}[/-]\d{1,2})',
+            r'DATE\s+(?:AND\s+TIME\s+)?OF\s+SALE:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})(?:,\s*\d{1,2}:\d{2}\s*[AP]M)?',
+            r'DATE\s+(?:AND\s+TIME\s+)?OF\s+SALE:?\s*(\d{4}[/-]\d{1,2}[/-]\d{1,2})(?:,\s*\d{1,2}:\d{2}\s*[AP]M)?',
+            r'([A-Z][a-z]+ \d{1,2}, \d{4})\s+at\s+\d{1,2}:\d{2}',
         ]
-        
+
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 return match.group(1).strip()
-        
+
         return ""
     
     def _clean_notice_text(self, text: str) -> str:
@@ -239,20 +240,23 @@ If a field cannot be found, use an empty string "".
             
             # Extract date of sale from "DATE AND TIME OF SALE:" pattern
             # Look for patterns like "DATE AND TIME OF SALE: September 23, 2025 at 10:00 AM"
-            date_of_sale_pattern = r'DATE\s+(?:AND\s+TIME\s+)?OF\s+SALE:?\s*([A-Za-z]+ \d{1,2}, \d{4})'
-            match = re.search(date_of_sale_pattern, text, re.IGNORECASE)
-            if match:
-                data['date_of_sale'] = match.group(1)
-                logger.info(f"🗓️  REGEX found date of sale: '{data['date_of_sale']}'")
-            else:
-                # Fallback to simple date pattern
-                date_pattern = r'(\d{1,2}/\d{1,2}/\d{4})'
-                match = re.search(date_pattern, text)
+            date_patterns = [
+                r'DATE\s+(?:AND\s+TIME\s+)?OF\s+SALE:?\s*([A-Za-z]+ \d{1,2}, \d{4})',
+                r'DATE\s+(?:AND\s+TIME\s+)?OF\s+SALE:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})(?:,\s*\d{1,2}:\d{2}\s*[AP]M)?',
+                r'DATE\s+(?:AND\s+TIME\s+)?OF\s+SALE:?\s*(\d{4}[/-]\d{1,2}[/-]\d{1,2})(?:,\s*\d{1,2}:\d{2}\s*[AP]M)?',
+                r'([A-Z][a-z]+ \d{1,2}, \d{4})\s+at\s+\d{1,2}:\d{2}',
+                r'(\d{1,2}/\d{1,2}/\d{4})',  # Fallback: any date pattern
+            ]
+
+            for pattern in date_patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
                 if match:
                     data['date_of_sale'] = match.group(1)
-                    logger.info(f"🗓️  REGEX fallback date: '{data['date_of_sale']}'")
-                else:
-                    logger.info("🗓️  REGEX could not find any date of sale")
+                    logger.info(f"🗓️  REGEX found date of sale: '{data['date_of_sale']}'")
+                    break
+
+            if not data['date_of_sale']:
+                logger.info("🗓️  REGEX could not find any date of sale")
                 
             # Simple plaintiff extraction
             plaintiff_pattern = r'(?:MORTGAGEE|CREDITOR|PLAINTIFF):\s*([^,\n<]+)'

@@ -120,10 +120,10 @@ class MNNoticeScraperClean:
         elif not self.twocaptcha_api_key:
             logger.warning("⚠️  No 2captcha API key - image captchas will be skipped")
 
-        # VPN Management - Disable auto_connect to prevent early connection issues
+        # VPN Management - Disabled by default, controlled by MULLVAD_ENABLED env var
         self.vpn_manager = MullvadManager(
-            enabled=True, auto_connect=False
-        )  # Set enabled=False to disable VPN
+            enabled=False, auto_connect=False
+        )  # Set enabled=True to enable VPN
 
         self.setup_browser(headless)
 
